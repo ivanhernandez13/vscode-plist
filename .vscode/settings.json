@@ -1,0 +1,16 @@
+{
+  "files.exclude": {
+    "out": true,
+    "dist": true,
+    "node_modules": true,
+    ".vscode-test": true,
+    "yarn.lock": true,
+    "ui/webview.js*": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/bower_components": true,
+    "**/*.code-search": true,
+    "*.js": true
+  },
+}

@@ -1,0 +1,7 @@
+out
+dist
+ui/*.js
+ui/*.js.map
+node_modules
+.vscode-test/
+*.vsix

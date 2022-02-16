@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "declaration": false,
+    "forceConsistentCasingInFileNames": true,
+    "lib": [
+      "ES2020"
+    ],
+    "module": "commonjs",
+    "noEmitOnError": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitReturns": true,
+    "noUnusedParameters": true,
+    "pretty": true,
+    "rootDir": "src",
+    "sourceMap": true,
+    "strict": true,
+    "target": "ES2020"
+  },
+  "exclude": [
+    "node_modules"
+  ],
+  "include": [
+    "./node_modules/@vscode/codicons/dist/codicon.css",
+    "./node_modules/vscode/lib/*",
+    "./node_modules/vscode/lib/*",
+    "./node_modules/vscode/vscode.d.ts",
+    "src/**/*.ts",
+    "ui/icons/**/*.svg",
+    "images/**/*.png",
+  ]
+}

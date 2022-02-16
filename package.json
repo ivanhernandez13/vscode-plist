@@ -1,0 +1,241 @@
+{
+  "activationEvents": [
+    "onCommand:plistEditor.clearCaches",
+    "onCustomEditor:plistEditor.bplistedit",
+    "onCustomEditor:plistEditor.plistedit",
+    "onCustomEditor:plistEditor.provisioningProfileEdit",
+    "onLanguage:plist"
+  ],
+  "author": {
+    "name": "Ivan Hernandez"
+  },
+  "bugs": {
+    "url": "https://github.com/ivanherandez13/vscode-plist/issues"
+  },
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": true
+    },
+    "virtualWorkspaces": true
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "icon": "$(go-to-file)",
+        "category": "Plist",
+        "command": "plistEditor.openWithDefaultEditor",
+        "title": "Open with Default Editor"
+      },
+      {
+        "icon": "$(file-code)",
+        "category": "Plist",
+        "command": "plistEditor.openWithPlistEditor",
+        "title": "Open with Plist Editor"
+      },
+      {
+        "category": "Plist",
+        "command": "plistEditor.collapseAll",
+        "title": "Collapse All"
+      },
+      {
+        "category": "Plist",
+        "command": "plistEditor.expandAll",
+        "title": "Expand All"
+      },
+      {
+        "category": "Plist",
+        "command": "plistEditor.clearCaches",
+        "title": "Clear Caches"
+      }
+    ],
+    "configuration": {
+      "title": "Property List Editor",
+      "properties": {
+        "binaryPlist.decoder": {
+          "description": "The decoder to use when working with binary plists. This option is only supported on macOS as `plutil` is only available on macOS. All other platforms use the experimental extension decoder.",
+          "default": "plutil",
+          "enum": [
+            "experimental",
+            "plutil"
+          ],
+          "type": "string"
+        },
+        "logging.level": {
+          "description": "The log level. Only enable for debugging.",
+          "default": null,
+          "enum": [
+            "error",
+            "info",
+            "warning"
+          ],
+          "type": "string"
+        }
+      }
+    },
+    "customEditors": [
+      {
+        "displayName": "Plist Editor",
+        "priority": "option",
+        "selector": [
+          {
+            "filenamePattern": "*.plist"
+          },
+          {
+            "filenamePattern": "*.entitlements"
+          }
+        ],
+        "viewType": "plistEditor.plistedit"
+      },
+      {
+        "displayName": "Binary Plist Editor",
+        "priority": "default",
+        "selector": [
+          {
+            "filenamePattern": "*.plist"
+          },
+          {
+            "filenamePattern": "*.entitlements"
+          }
+        ],
+        "viewType": "plistEditor.bplistedit"
+      },
+      {
+        "displayName": "Provisioning Profile",
+        "priority": "default",
+        "selector": [
+          {
+            "filenamePattern": "*.mobileprovision"
+          }
+        ],
+        "viewType": "plistEditor.provisioningProfileEdit"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "plistEditor.openWithDefaultEditor",
+          "when": "activeCustomEditorId == plistEditor.plistedit"
+        },
+        {
+          "command": "plistEditor.openWithPlistEditor",
+          "when": "resourceExtname == .plist && activeCustomEditorId != plistEditor.plistedit"
+        },
+        {
+          "command": "plistEditor.openWithPlistEditor",
+          "when": "resourceExtname == .entitlements && activeCustomEditorId != plistEditor.plistedit"
+        },
+        {
+          "command": "plistEditor.collapseAll",
+          "when": "activeCustomEditorId == plistEditor.plistedit"
+        },
+        {
+          "command": "plistEditor.expandAll",
+          "when": "activeCustomEditorId == plistEditor.plistedit"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "plistEditor.openWithDefaultEditor",
+          "when": "activeCustomEditorId == plistEditor.plistedit",
+          "group": "navigation"
+        },
+        {
+          "command": "plistEditor.openWithPlistEditor",
+          "when": "resourceExtname == .plist && activeCustomEditorId != plistEditor.plistedit",
+          "group": "navigation"
+        },
+        {
+          "command": "plistEditor.openWithPlistEditor",
+          "when": "resourceExtname == .entitlements && activeCustomEditorId != plistEditor.plistedit",
+          "group": "navigation"
+        }
+      ],
+      "webview/context": [
+        {
+          "command": "plistEditor.collapseAll",
+          "when": "activeCustomEditorId == plistEditor.plistedit"
+        },
+        {
+          "command": "plistEditor.expandAll",
+          "when": "activeCustomEditorId == plistEditor.plistedit"
+        }
+      ]
+    }
+  },
+  "dependencies": {
+    "@types/plist": "^3.0.2",
+    "@vscode/codicons": "^0.0.28",
+    "plist": "^3.0.4"
+  },
+  "description": "Allows viewing and editing files in a plist editor",
+  "devDependencies": {
+    "@types/glob": "^7.2.0",
+    "@types/jasmine": "^4.3.1",
+    "@types/node": "18.x",
+    "@types/vscode": "^1.73.0",
+    "@typescript-eslint/eslint-plugin": "^5.9.1",
+    "@typescript-eslint/parser": "^5.9.1",
+    "@vscode/test-electron": "^2.0.3",
+    "browser": "^0.2.6",
+    "buffer": "^6.0.3",
+    "eslint": "^8.6.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "glob": "^7.2.0",
+    "jasmine": "^4.5.0",
+    "prettier": "^2.8.1",
+    "process": "^0.11.10",
+    "ts-loader": "^9.2.6",
+    "typescript": "^4.5.4",
+    "vscode-uri": "^3.0.7",
+    "webpack": "^5.66.0",
+    "webpack-cli": "^4.9.1"
+  },
+  "displayName": "Property List Editor",
+  "engines": {
+    "node": ">=12.0.0",
+    "vscode": "^1.73.0"
+  },
+  "icon": "icon.png",
+  "keywords": [
+    "plist",
+    "Property List",
+    "xml"
+  ],
+  "license": "MIT",
+  "main": "./dist/extension.js",
+  "browser": "./dist/extension-web.js",
+  "name": "vscode-plist",
+  "publisher": "ivhernandez",
+  "repository": {
+    "url": "https://github.com/ivanhernandez13/vscode-plist.git",
+    "type": "git"
+  },
+  "scripts": {
+    "compile": "webpack",
+    "compile-tests": "tsc -p . --outDir out",
+    "compile-ui": "tsc ./ui/webview.ts --sourceMap true --target es5 --lib es2019,dom",
+    "lint": "eslint '**/*.ts'",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "posttest": "npm run lint",
+    "prepare": "npm run compile",
+    "pretest": "npm run compile-tests && npm run compile",
+    "test": "node ./out/test/runTest.js",
+    "vscode:prepublish": "npm run package",
+    "watch": "webpack --watch",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "watch-ui": "npm run compile-ui --watch",
+    "compile-web": "webpack",
+    "watch-web": "webpack --watch"
+  },
+  "version": "0.1.1",
+  "extensionKind": [
+    "ui",
+    "workspace"
+  ],
+  "preview": true
+}
