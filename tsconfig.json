@@ -1,33 +1,13 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "allowUnreachableCode": false,
-    "allowUnusedLabels": false,
-    "declaration": false,
-    "forceConsistentCasingInFileNames": true,
-    "lib": [
-      "ES2020"
-    ],
-    "module": "commonjs",
-    "noEmitOnError": true,
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitReturns": true,
-    "noUnusedParameters": true,
-    "pretty": true,
-    "rootDir": "src",
-    "sourceMap": true,
-    "strict": true,
-    "target": "ES2020"
+    "paths": {
+      "host": ["./src/common/utilities/node/host"],
+      "provisioning_profile_editor_controller": ["./src/core/mobileprovision/node/provisioning_profile_editor_controller"],
+      "decoder": ["./src/core/binary/node/decoder"]
+    },
   },
   "exclude": [
-    "node_modules"
+    "**/browser/*",
   ],
-  "include": [
-    "./node_modules/@vscode/codicons/dist/codicon.css",
-    "./node_modules/vscode/lib/*",
-    "./node_modules/vscode/lib/*",
-    "./node_modules/vscode/vscode.d.ts",
-    "src/**/*.ts",
-    "ui/icons/**/*.svg",
-    "images/**/*.png",
-  ]
 }

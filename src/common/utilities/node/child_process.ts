@@ -1,6 +1,6 @@
 import * as child_process from 'child_process';
 import {CancellationToken} from 'vscode';
-import {logger} from '../logging/extension_logger';
+import {logger} from '../../logging/extension_logger';
 
 /** Runs a NodeJS child_process and returns its output. */
 export async function checkOutput(

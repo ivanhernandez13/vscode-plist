@@ -133,7 +133,7 @@ export class PlistModifier extends SelfDisposing {
         newValue = value;
         break;
       case 'Boolean':
-        newValue = value === '0' ? false : true;
+        newValue = value === 'YES' ? true : false;
         break;
       case 'Number':
         newValue = Number(value);

@@ -4,7 +4,7 @@ import {EDITOR_COMMANDS} from './core/commands';
 import {GeneratedFileTracker} from './core/binary/generated_file_tracker';
 import {StorageLocations} from './common/storage_location';
 import {PlistEditorController} from './core/textual/plist_editor_controller';
-import {ProvisioningProfileEditorController} from './core/mobileprovision/provisioning_profile_editor_controller';
+import {ProvisioningProfileEditorController} from 'provisioning_profile_editor_controller';
 
 /** Called by VS Code when the extension is activated. */
 export async function activate(context: vscode.ExtensionContext) {

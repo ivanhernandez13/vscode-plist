@@ -52,10 +52,7 @@
     {
 			"type": "npm",
 			"script": "compile-web",
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			},
+			"group":  "build",
 			"problemMatcher": [
 				"$ts-webpack",
 				"$tslint-webpack"

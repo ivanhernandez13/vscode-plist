@@ -33,14 +33,16 @@ function entriesWithNumberOfChildren(
 export class PlistWebviewController extends SelfDisposing {
   private readonly operations: PlistOperations;
 
-  private readonly docAttributes: {
+  private pendingContent?: string;
+
+  readonly docAttributes: {
     readonly isGenerated: boolean;
     readonly isReadonly: boolean;
   };
 
   constructor(
     private readonly document: vscode.TextDocument,
-    readonly webview: vscode.Webview,
+    readonly panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     private readonly storageLocations: StorageLocations,
     private readonly persistentState: {
@@ -52,6 +54,7 @@ export class PlistWebviewController extends SelfDisposing {
     this.disposables.push(this.operations);
     this.docAttributes = this.calculateDocAttributes();
 
+    const webview = panel.webview;
     webview.options = {
       enableScripts: true,
     };
@@ -73,19 +76,35 @@ export class PlistWebviewController extends SelfDisposing {
 
     webview.onDidReceiveMessage(
       async m => {
-        if (this.handleIncomingMessages(m)) {
-          this.operations.update();
+        if (!this.handleIncomingMessages(m)) return;
 
-          webview.postMessage({
-            command: 'renderViewModel',
-            viewModel: await this.operations.viewModel,
-            expandedNodes: this.persistentState.expandedNodes.get(),
-          });
-        }
+        this.operations.update();
+
+        webview.postMessage({
+          command: 'renderViewModel',
+          viewModel: await this.operations.viewModel,
+          expandedNodes: this.persistentState.expandedNodes.get(),
+        });
       },
       this,
       this.disposables
     );
+
+    panel.onDidChangeViewState(
+      s => {
+        if (!s.webviewPanel.visible || this.pendingContent === undefined) {
+          return;
+        }
+
+        const content = this.pendingContent;
+        this.pendingContent = undefined;
+        this.renderEditor(content);
+      },
+      this,
+      this.disposables
+    );
+
+    this.disposables.push(panel);
   }
 
   private calculateDocAttributes(): {
@@ -106,6 +125,11 @@ export class PlistWebviewController extends SelfDisposing {
   }
 
   async renderEditor(updatedContent?: string): Promise<void> {
+    if (!this.panel.visible) {
+      this.pendingContent = updatedContent;
+      return;
+    }
+
     if (updatedContent) {
       // TODO: This should not be needed, the model should update itself
       // whenever a node is added or removed.
@@ -121,7 +145,7 @@ export class PlistWebviewController extends SelfDisposing {
       );
     }
 
-    this.webview.postMessage({
+    this.panel.webview.postMessage({
       command: 'renderViewModel',
       viewModel,
       expandedNodes: this.persistentState.expandedNodes.get(),

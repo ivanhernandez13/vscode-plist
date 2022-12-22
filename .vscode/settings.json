@@ -13,4 +13,6 @@
     "**/*.code-search": true,
     "*.js": true
   },
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true
 }

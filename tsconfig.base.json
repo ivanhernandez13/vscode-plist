@@ -1,0 +1,22 @@
+{
+  "extends": "./node_modules/gts/tsconfig-google.json",
+  "compilerOptions": {
+    "lib": ["ES2020"],
+    "target": "ES2020",
+    "declaration": false,
+    "outDir": "./",
+    "rootDir": "src",
+  },
+  "include": [
+    "./node_modules/@vscode/codicons/dist/codicon.css",
+    "./node_modules/vscode/lib/*",
+    "./node_modules/vscode/lib/*",
+    "./node_modules/vscode/vscode.d.ts",
+    "src/**/*.ts",
+    "ui/icons/**/*.svg",
+    "images/**/*.png",
+  ],
+  "exclude": [
+    "node_modules",
+  ],
+}

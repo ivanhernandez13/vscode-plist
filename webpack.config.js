@@ -8,7 +8,7 @@ const webpack = require('webpack');
 //@ts-check
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
 
-const webConfig = /** @type WebpackConfig */ {
+const browserConfig = /** @type WebpackConfig */ {
   context: __dirname,
   mode: 'none', // this leaves the source code as close as possible to the original (when packaging we set this to 'production')
   target: 'webworker', // web extensions run in a webworker context
@@ -18,21 +18,24 @@ const webConfig = /** @type WebpackConfig */ {
   },
   output: {
     filename: '[name].js',
-    path: path.join(__dirname, './dist'),
+    path: path.join(__dirname, 'dist'),
     libraryTarget: 'commonjs',
   },
   resolve: {
     mainFields: ['browser', 'module', 'main'], // look for `browser` entry point in imported node modules
     extensions: ['.ts', '.js'], // support ts-files and js-files
-    alias: {},
+    alias: {
+      decoder: path.resolve(__dirname, 'src/core/binary/browser/decoder'),
+      host: path.resolve(__dirname, 'src/common/utilities/browser/host'),
+      provisioning_profile_editor_controller: path.resolve(
+        __dirname,
+        'src/core/mobileprovision/browser/provisioning_profile_editor_controller'
+      ),
+    },
     fallback: {
       // Webpack 5 no longer polyfills Node.js core modules automatically.
       // see https://webpack.js.org/configuration/resolve/#resolvefallback
       // for the list of Node.js core module polyfills.
-      assert: require.resolve('assert'),
-      util: require.resolve('util'),
-      os: false,
-      child_process: false,
     },
   },
   module: {
@@ -42,7 +45,7 @@ const webConfig = /** @type WebpackConfig */ {
         exclude: /node_modules/,
         use: [
           {
-            loader: 'ts-loader',
+            loader: 'ts-loader?configFile=tsconfig.browser.json',
           },
         ],
       },
@@ -72,9 +75,8 @@ const nodeConfig = {
 
   entry: './src/extension.ts', // the entry point of this extension, 📖 -> https://webpack.js.org/configuration/entry-context/
   output: {
-    // the bundle is stored in the 'dist' folder (check package.json), 📖 -> https://webpack.js.org/configuration/output/
-    path: path.resolve(__dirname, 'dist'),
     filename: 'extension.js',
+    path: path.resolve(__dirname, 'dist'),
     libraryTarget: 'commonjs2',
   },
   externals: {
@@ -84,6 +86,14 @@ const nodeConfig = {
   resolve: {
     // support reading TypeScript and JavaScript files, 📖 -> https://github.com/TypeStrong/ts-loader
     extensions: ['.ts', '.js'],
+    alias: {
+      decoder: path.resolve(__dirname, 'src/core/binary/node/decoder'),
+      host: path.resolve(__dirname, 'src/common/utilities/node/host'),
+      provisioning_profile_editor_controller: path.resolve(
+        __dirname,
+        'src/core/mobileprovision/node/provisioning_profile_editor_controller'
+      ),
+    },
   },
   module: {
     rules: [
@@ -92,7 +102,7 @@ const nodeConfig = {
         exclude: /node_modules/,
         use: [
           {
-            loader: 'ts-loader',
+            loader: 'ts-loader?configFile=tsconfig.json',
           },
         ],
       },
@@ -104,4 +114,4 @@ const nodeConfig = {
   },
 };
 
-module.exports = [nodeConfig, webConfig];
+module.exports = [nodeConfig, browserConfig];

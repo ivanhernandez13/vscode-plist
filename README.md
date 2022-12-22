@@ -33,20 +33,11 @@ This extension can  __view__ and __edit__ entitlements files (i.e. .entitlements
 property list files with a different file extension.
 
 It can also __view__ provisioning profiles (i.e. .mobileprovision) by decrypting them into their
-plist representation. Editing provisioning profiles is __not__ supported.
+plist representation. Editing provisioning profiles is __not__ supported. [macOS only]
 
 <!-- ![view provisioning profiles](images/provisioning_profile.png) -->
 
-## Requirements
-
-This extension only works on macOS due to a dependency on the `plutil` and `security` command line
-tools for working with binary property lists and provisioning profiles respectively.
-
 ## Known Issues
-
-* Editing the property list file directly (e.g. with the default editor) does not update the custom
-  editor if it is already open. Closing and reopening the custom editor will reflect any external
-  edits.
 
 * Inefficient file saves. When saving changes to a file this extension replaces the entire contents
   of the file. This should be optimized to edit only the portion that has changed.

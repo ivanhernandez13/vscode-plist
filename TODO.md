@@ -1,5 +1,6 @@
 ### TODO
 
+- Save column width state
 - Add tests for:
   - Adding/Removing nodes does not affect expansion state of other nodes.
 - Update the model in place.
@@ -12,3 +13,4 @@
 - Dropdown immediately closes after opened.
 - Reopening a generated binary plist are not saved backed to the original file.
 - Adding a new item collapses te entry.
+- Make input for boolean values a dropdown instead of textbox.

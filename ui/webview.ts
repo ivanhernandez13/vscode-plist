@@ -89,9 +89,15 @@ interface HTMLRowType {
   dropdown: HTMLSelectElement;
 }
 
-interface HTMLRowValue {
+interface HTMLRowValueInput {
   inputBox: HTMLInputElement;
 }
+interface HTMLRowValueSelect {
+  dropdown: HTMLSelectElement;
+}
+type HTMLRowValue = (HTMLRowValueInput | HTMLRowValueSelect) & {
+  element: HTMLInputElement | HTMLSelectElement;
+};
 
 interface HTMLRow {
   container: HTMLTableRowElement;
@@ -310,10 +316,10 @@ class WebviewController {
     if (!viewAndModel) return;
 
     logger.info('renderWebviewBody.newlyInsertedNode', newNodeId, viewAndModel);
-    viewAndModel.view.value.inputBox.dispatchEvent(
+    viewAndModel.view.value.element.dispatchEvent(
       new MouseEvent('dblclick', {bubbles: true, cancelable: false})
     );
-    viewAndModel.view.value.inputBox.focus();
+    viewAndModel.view.value.element.focus();
   }
 
   private clearSelectedNode() {
@@ -326,8 +332,10 @@ class WebviewController {
       this.webviewState.selectedNodeId = undefined;
     }
 
-    const buttons = Array.from(document.getElementsByClassName(CSS.noHide));
-    for (const button of buttons) {
+    const noHideElements = Array.from(
+      document.getElementsByClassName(CSS.noHide)
+    );
+    for (const button of noHideElements) {
       button.classList.remove(CSS.noHide);
     }
   }
@@ -341,9 +349,14 @@ class WebviewController {
       view.container.addEventListener('click', () => {
         this.clearSelectedNode();
         setTimeout(() => {
-          view.key.plusButton.classList.add(CSS.noHide);
-          view.key.minusButton?.classList.add(CSS.noHide);
-          view.type.dropdown.parentElement?.classList.add(CSS.noHide);
+          if (!this.webviewState.isReadonly) {
+            view.key.plusButton.classList.add(CSS.noHide);
+            view.key.minusButton?.classList.add(CSS.noHide);
+            view.type.dropdown.parentElement?.classList.add(CSS.noHide);
+            if ('dropdown' in view.value) {
+              view.value.dropdown.parentElement?.classList.add(CSS.noHide);
+            }
+          }
           view.container.classList.add(CSS.plistRowHighlight);
           this.webviewState.selectedNodeId = viewModel.id;
         });
@@ -399,17 +412,21 @@ class WebviewController {
         continue;
       }
 
-      for (const inputBox of [view.key.inputBox, view.value.inputBox]) {
+      for (const inputBox of [view.key.inputBox, view.value.element]) {
         inputBox.addEventListener('dblclick', () => {
           inputBox.classList.remove(CSS.inputAsLabel);
           inputBox.classList.add(CSS.focusedInputAsLabel);
-          inputBox.readOnly = false;
+          if ('readOnly' in inputBox) {
+            inputBox.readOnly = false;
+          }
           this.webviewState.activeInputElement = inputBox;
         });
         inputBox.addEventListener('blur', () => {
           inputBox.classList.add(CSS.inputAsLabel);
           inputBox.classList.remove(CSS.focusedInputAsLabel);
-          inputBox.readOnly = true;
+          if ('readOnly' in inputBox) {
+            inputBox.readOnly = true;
+          }
           this.webviewState.activeInputElement = undefined;
 
           if (
@@ -430,7 +447,7 @@ class WebviewController {
 
             this.updatePlistNode('key', viewModel.id, inputBox.value);
           } else if (
-            inputBox === view.value.inputBox &&
+            inputBox === view.value.element &&
             viewModel.value !== inputBox.value
           ) {
             let inputBoxValue = inputBox.value;
@@ -677,13 +694,14 @@ class ViewModelRenderer {
     const type = this.renderPlistType(node.type, options);
     const value = this.renderPlistValue(
       node.value,
-      !IMMUTABLE_PLIST_ENTRY_TYPES.includes(node.type)
+      !IMMUTABLE_PLIST_ENTRY_TYPES.includes(node.type),
+      node.type
     );
 
     const tableRow = createElement('tr', CSS.plistRow, undefined, [
       createElement('td', undefined, undefined, [key.container]),
       createElement('td', undefined, undefined, [type.dropdown]),
-      createElement('td', undefined, undefined, [value.inputBox]),
+      createElement('td', undefined, undefined, [value.element]),
     ]);
 
     const isExpanded = this.delegate.isExpanded(node.id);
@@ -712,7 +730,29 @@ class ViewModelRenderer {
     };
   }
 
-  private renderPlistValue(title: string, mutable: boolean): HTMLRowValue {
+  private renderPlistValue(
+    title: string,
+    mutable: boolean,
+    type: PlistEntryType
+  ): HTMLRowValue {
+    if (type === 'Boolean') {
+      const dropdownOptions = ['YES', 'NO'].map(plistType =>
+        createElement('option', undefined, {
+          textContent: plistType,
+          value: plistType,
+          selected: plistType === title,
+        })
+      );
+
+      const dropdown = createElement(
+        'select',
+        CSS.selectAsLabel,
+        undefined,
+        dropdownOptions
+      );
+      return {dropdown, element: dropdown};
+    }
+
     const inputBox = createInputAsLabel(title);
 
     if (!mutable) {
@@ -720,7 +760,7 @@ class ViewModelRenderer {
       inputBox.classList.add(CSS.faded);
     }
 
-    return {inputBox};
+    return {inputBox, element: inputBox};
   }
 
   private renderPlistKey(

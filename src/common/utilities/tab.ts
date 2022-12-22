@@ -8,7 +8,11 @@ export async function replaceTab(
 ) {
   const targetTab = vscode.window.tabGroups.all
     .flatMap(group => group.tabs)
-    .find(tab => (tab.input as {uri?: vscode.Uri}).uri?.path === replacee.path);
+    .find(
+      tab =>
+        tab.input !== undefined &&
+        (tab.input as {uri?: vscode.Uri}).uri?.path === replacee.path
+    );
   if (targetTab) {
     await vscode.window.tabGroups.close(targetTab);
   }

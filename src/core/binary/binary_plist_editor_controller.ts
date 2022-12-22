@@ -1,19 +1,15 @@
 import * as vscode from 'vscode';
-import * as plist from 'plist';
 
 import {SelfDisposing} from '../../common/utilities/self_disposing';
-import {plutil} from '../../common/plutil/plutil';
 import {GeneratedFileTracker} from './generated_file_tracker';
 import {PlistEditorController} from '../textual/plist_editor_controller';
 import {replaceTab} from '../../common/utilities/tab';
 import {generatedFileUri} from '../../common/generated_files';
-import {decodeBinaryPlist, isBinaryPlist} from './decoder/binary_plist_decoder';
+import {isBinaryPlist} from './decoder/binary_plist_decoder';
 import {UriUtils} from '../../common/utilities/vscode';
-import {isLocalMacOS} from '../../common/utilities/host';
-
-interface BinaryPlistDocument extends vscode.CustomDocument {
-  generatedUri?: vscode.Uri;
-}
+import {isLocalMacOS} from 'host';
+import {generateTextualPlist, exportTextualPlist} from 'decoder';
+import {BinaryPlistDocument} from './binary_plist_document';
 
 /**
  * Registers a custom editor that is used whenever a .plist file (binary OR
@@ -44,16 +40,7 @@ export class BinaryPlistEditorController
     private readonly tracker: GeneratedFileTracker
   ) {
     super();
-    this.disposables.push(
-      ...this.performRegistrations(),
-      new vscode.Disposable(() =>
-        Promise.all(
-          Array.from(this.tracker.generatedFiles.keys()).map(f =>
-            vscode.workspace.fs.delete(f, {useTrash: false})
-          )
-        )
-      )
-    );
+    this.disposables.push(...this.performRegistrations());
   }
 
   async openCustomDocument(uri: vscode.Uri): Promise<BinaryPlistDocument> {
@@ -72,24 +59,11 @@ export class BinaryPlistEditorController
     if (document.generatedUri) {
       try {
         webviewPanel.webview.html = `Generating readable plist from file://${document.uri}...`;
-        if (BinaryPlistEditorController.usingMacosDecoder) {
-          await plutil.convert(
-            document.uri.fsPath,
-            'plist',
-            document.generatedUri.fsPath,
-            token
-          );
-        } else {
-          vscode.window.showWarningMessage(
-            'Using experimental binary plist decoder to render plist.'
-          );
-          const content = await decodeBinaryPlist(document.uri);
-          const plistContent = plist.build(content as plist.PlistValue);
-          await vscode.workspace.fs.writeFile(
-            document.generatedUri,
-            new Uint8Array(Buffer.from(plistContent))
-          );
-        }
+        await generateTextualPlist(
+          document,
+          token,
+          BinaryPlistEditorController.usingMacosDecoder
+        );
         webviewPanel.webview.html = `Readable plist was generated at ${document.generatedUri}.`;
       } catch (err) {
         vscode.window.showErrorMessage(
@@ -125,7 +99,7 @@ export class BinaryPlistEditorController
 
           const uri = this.tracker.generatedFiles.get(asciiDoc.uri);
           if (uri) {
-            plutil.convert(asciiDoc.uri.fsPath, 'bplist', uri.fsPath);
+            exportTextualPlist(asciiDoc.uri, uri);
           }
         })
       );

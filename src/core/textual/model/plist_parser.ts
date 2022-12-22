@@ -151,7 +151,7 @@ export class PlistParser {
       case 'Number':
         return String(value);
       case 'Boolean':
-        return value === true ? '1' : '0';
+        return value === true ? 'YES' : 'NO';
       case 'Dictionary': {
         const dict = value as object;
         return this.getItemsString(Object.keys(dict).length);

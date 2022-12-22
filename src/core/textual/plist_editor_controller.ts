@@ -18,7 +18,10 @@ export class PlistEditorController
 {
   static readonly viewType = 'plistEditor.plistedit';
 
-  private readonly editorByUri = new Map<string, PlistWebviewController>();
+  private readonly webviewControllerByPath = new Map<
+    string,
+    PlistWebviewController
+  >();
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -44,24 +47,26 @@ export class PlistEditorController
       ),
     };
 
-    let webviewController = this.editorByUri.get(filepath);
+    let webviewController = this.webviewControllerByPath.get(filepath);
     if (!webviewController) {
       webviewController = new PlistWebviewController(
         document,
-        webviewPanel.webview,
+        webviewPanel,
         this.extensionUri,
         this.storageLocations,
         persistentState
       );
       this.disposables.push(webviewController);
+      this.webviewControllerByPath.set(filepath, webviewController);
 
       const disposable = webviewPanel.onDidDispose(() => {
+        this.webviewControllerByPath.delete(filepath);
         webviewController?.dispose();
+        if (webviewController?.docAttributes.isGenerated) {
+          vscode.workspace.fs.delete(document.uri);
+        }
         disposable.dispose();
-        this.editorByUri.delete(filepath);
       });
-
-      this.editorByUri.set(filepath, webviewController);
     }
 
     return webviewController.renderEditor();
@@ -70,18 +75,33 @@ export class PlistEditorController
   private performRegistrations(): vscode.Disposable[] {
     const debouncedReload = new Debouncer(
       (e: vscode.TextDocumentChangeEvent) => {
-        const document = this.editorByUri.get(e.document.uri.path);
-        if (!document) return;
+        const controller = this.webviewControllerByPath.get(
+          e.document.uri.path
+        );
+        if (!controller) return;
 
         const updatedContent = e.document.getText();
         if (!updatedContent) return;
 
-        document.renderEditor(updatedContent);
+        controller.renderEditor(updatedContent);
       },
-      100
+      500
     );
 
     return [
+      vscode.workspace.onDidChangeConfiguration(e => {
+        if (!e.affectsConfiguration('binaryPlist.decoder')) return;
+
+        for (const [
+          path,
+          controller,
+        ] of this.webviewControllerByPath.entries()) {
+          if (controller.docAttributes.isGenerated) {
+            controller.dispose();
+            this.webviewControllerByPath.delete(path);
+          }
+        }
+      }),
       vscode.window.registerCustomEditorProvider(
         PlistEditorController.viewType,
         this,
@@ -126,12 +146,12 @@ export class PlistEditorController
       return false;
     }
 
-    const controller = this.editorByUri.get(activeTab.uri.path);
+    const controller = this.webviewControllerByPath.get(activeTab.uri.path);
     if (!controller) {
       logger.logWarning('Active tab does not have a webview controller.');
       return false;
     }
 
-    return controller.webview.postMessage({command});
+    return controller.panel.webview.postMessage({command});
   }
 }

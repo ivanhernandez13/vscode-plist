@@ -1,6 +1,6 @@
 import {CancellationToken} from 'vscode';
-import {checkOutput} from '../utilities/child_process';
-import {quoted} from '../utilities/string';
+import {checkOutput} from './child_process';
+import {quoted} from '../string';
 
 async function convert(
   input: string,
