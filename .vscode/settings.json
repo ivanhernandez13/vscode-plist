@@ -8,8 +8,8 @@
     "ui/webview.js*": true
   },
   "search.exclude": {
+    "package-lock.json": true,
     "**/node_modules": true,
-    "**/bower_components": true,
     "**/*.code-search": true,
     "*.js": true
   },

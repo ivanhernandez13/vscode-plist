@@ -6,10 +6,11 @@
       "type": "extensionHost",
       "request": "launch",
       "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
-      "env": {"DDEBUG":"1"},
+      "env": {"DDEBUG": "1"},
       "outFiles": ["${workspaceFolder}/dist/**/*.js"],
       "preLaunchTask": "${defaultBuildTask}",
-      "autoAttachChildProcesses": true
+      "autoAttachChildProcesses": true,
+      "debugWebviews": true
     },
     {
       "name": "Extension Tests",
@@ -28,33 +29,29 @@
       "preLaunchTask": "tasks: watch-tests"
     },
     {
-			"name": "Run Web Extension in VS Code",
-			"type": "pwa-extensionHost",
-			"debugWebWorkerHost": true,
-			"request": "launch",
-			"args": [
-				"--extensionDevelopmentPath=${workspaceFolder}",
-				"--extensionDevelopmentKind=web"
-			],
-			"outFiles": [
-				"${workspaceFolder}/dist/web/**/*.js"
-			],
-			"preLaunchTask": "npm: watch-web"
-		},
-		{
-			"name": "Extension Tests in VS Code",
-			"type": "extensionHost",
-			"debugWebWorkerHost": true,
-			"request": "launch",
-			"args": [
-				"--extensionDevelopmentPath=${workspaceFolder}",
-				"--extensionDevelopmentKind=web",
-				"--extensionTestsPath=${workspaceFolder}/dist/web/test/suite/index"
-			],
-			"outFiles": [
-				"${workspaceFolder}/dist/web/**/*.js"
-			],
-			"preLaunchTask": "npm: watch-web"
-		}
+      "name": "Run Web Extension in VS Code",
+      "type": "pwa-extensionHost",
+      "debugWebWorkerHost": true,
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--extensionDevelopmentKind=web"
+      ],
+      "outFiles": ["${workspaceFolder}/dist/web/**/*.js"],
+      "preLaunchTask": "npm: watch-web"
+    },
+    {
+      "name": "Extension Tests in VS Code",
+      "type": "extensionHost",
+      "debugWebWorkerHost": true,
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--extensionDevelopmentKind=web",
+        "--extensionTestsPath=${workspaceFolder}/dist/web/test/suite/index"
+      ],
+      "outFiles": ["${workspaceFolder}/dist/web/**/*.js"],
+      "preLaunchTask": "npm: watch-web"
+    }
   ]
 }

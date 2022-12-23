@@ -235,7 +235,7 @@
     "clean": "gts clean",
     "fix": "gts fix"
   },
-  "version": "0.1.2",
+  "version": "0.1.3",
   "extensionKind": [
     "ui",
     "workspace"

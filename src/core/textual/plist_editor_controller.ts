@@ -45,6 +45,7 @@ export class PlistEditorController
         keyName(filepath, 'expandedNodes'),
         []
       ),
+      columnWidths: scopedMemento(this.memento, keyName('column', 'width'), {}),
     };
 
     let webviewController = this.webviewControllerByPath.get(filepath);

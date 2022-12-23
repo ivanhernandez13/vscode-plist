@@ -3,11 +3,11 @@
   "compilerOptions": {
     "paths": {
       "host": ["./src/common/utilities/browser/host"],
-      "provisioning_profile_editor_controller": ["./src/core/mobileprovision/browser/provisioning_profile_editor_controller"],
+      "provisioning_profile_editor_controller": [
+        "./src/core/mobileprovision/browser/provisioning_profile_editor_controller"
+      ],
       "decoder": ["./src/core/binary/browser/decoder"]
-    },
+    }
   },
-  "exclude": [
-    "**/node/*",
-  ],
+  "exclude": ["**/node/*"]
 }

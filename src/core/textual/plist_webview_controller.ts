@@ -47,6 +47,7 @@ export class PlistWebviewController extends SelfDisposing {
     private readonly storageLocations: StorageLocations,
     private readonly persistentState: {
       expandedNodes: ScopedMemento<number[]>;
+      columnWidths: ScopedMemento<{first?: string; second?: string}>;
     }
   ) {
     super();
@@ -84,6 +85,7 @@ export class PlistWebviewController extends SelfDisposing {
           command: 'renderViewModel',
           viewModel: await this.operations.viewModel,
           expandedNodes: this.persistentState.expandedNodes.get(),
+          columnWidths: this.persistentState.columnWidths.get(),
         });
       },
       this,
@@ -150,6 +152,7 @@ export class PlistWebviewController extends SelfDisposing {
       viewModel,
       expandedNodes: this.persistentState.expandedNodes.get(),
       isReadonly: this.docAttributes.isReadonly,
+      columnWidths: this.persistentState.columnWidths.get(),
     });
   }
 
@@ -224,6 +227,15 @@ export class PlistWebviewController extends SelfDisposing {
         // TODO: Figure out how to make find first instance.
         // vscode.commands.executeCommand('editor.action.webvieweditor.showFind');
         break;
+
+      case 'columnWidthsChange': {
+        const columnWidths = message.columnWidths as {
+          first?: string;
+          second?: string;
+        };
+        this.persistentState.columnWidths.update(columnWidths);
+        break;
+      }
 
       default:
         break;

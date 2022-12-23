@@ -72,9 +72,15 @@ interface ViewModel {
   parent?: number;
 }
 
+interface ColumnWidths {
+  first?: string;
+  second?: string;
+}
+
 interface ViewModelRendererDelegate {
   isExpanded(id: number): boolean;
   isReadonly(): boolean;
+  columnWidths: ColumnWidths & {update(arg: ColumnWidths): void};
 }
 
 interface HTMLRowKey {
@@ -118,6 +124,7 @@ interface WebviewState {
   lastSelectedNodeId?: number;
   selectedNodeId?: number;
   activeInputElement?: HTMLInputElement | HTMLSelectElement;
+  columnWidths: ColumnWidths;
 }
 
 interface State {
@@ -129,12 +136,21 @@ const ROOT_NODE_ID = 0;
 const BODY_CONTENT = document.getElementById('bodyContent')!;
 const GENERATED_BANNER = document.getElementById('generatedBanner');
 
+function percentage(a: number, b: number): string {
+  return ((a / b) * 100).toFixed(0) + '%';
+}
+
+function seconds(num: number): number {
+  return num * 1000;
+}
+
 class WebviewController {
   private readonly vsCodeApi: VsCodeApi;
   private readonly viewModel: ViewModelRenderer;
   private readonly webviewState: WebviewState = {
     expandedNodeIds: [],
     isReadonly: false,
+    columnWidths: {},
   };
 
   private rootPlistNode: ViewModel = {
@@ -148,11 +164,25 @@ class WebviewController {
 
   constructor() {
     this.vsCodeApi = acquireVsCodeApi();
-    this.viewModel = new ViewModelRenderer({
+
+    const delegate: ViewModelRendererDelegate = {
       isExpanded: (id: number) =>
         this.webviewState.expandedNodeIds.includes(id),
       isReadonly: () => this.webviewState?.isReadonly === true,
-    });
+      columnWidths: {
+        get first() {
+          return this.webview.columnWidths.first;
+        },
+        get second() {
+          return this.webview.columnWidths.second;
+        },
+        update: (arg: ColumnWidths) => {
+          this.columnWidthsChanged({first: arg.first, second: arg.second});
+        },
+      },
+    };
+
+    this.viewModel = new ViewModelRenderer(delegate);
     this.configureGlobalEventListeners();
     this.renderWebviewFromSavedState();
     this.renderBannerForGeneratedFiles();
@@ -206,6 +236,10 @@ class WebviewController {
       this.webviewState.expandedNodeIds.push(
         ...unsafeRestoredState.webview.expandedNodeIds
       );
+      this.webviewState.columnWidths.first =
+        unsafeRestoredState.webview.columnWidths.first;
+      this.webviewState.columnWidths.second =
+        unsafeRestoredState.webview.columnWidths.second;
     }
     if (unsafeRestoredState.viewModel) {
       this.renderWebviewBody(unsafeRestoredState.viewModel);
@@ -220,6 +254,8 @@ class WebviewController {
         this.webviewState.expandedNodeIds.length = 0;
         this.webviewState.expandedNodeIds.push(...message.expandedNodes);
         this.webviewState.isReadonly = message.isReadonly;
+        this.webviewState.columnWidths.first = message.columnWidths.first;
+        this.webviewState.columnWidths.second = message.columnWidths.second;
         this.renderBannerForGeneratedFiles();
         logger.info('onMessageReceived.renderViewModel', message.viewModel);
         this.renderWebviewBody(message.viewModel);
@@ -276,6 +312,16 @@ class WebviewController {
       ids: this.webviewState.expandedNodeIds,
     });
     this.saveState({webview: this.webviewState});
+  }
+
+  private columnWidthsChanged(columnWidths: ColumnWidths): void {
+    this.webviewState.columnWidths.first = columnWidths.first;
+    this.webviewState.columnWidths.second = columnWidths.second;
+    this.saveState({webview: this.webviewState});
+    this.vsCodeApi.postMessage({
+      command: 'columnWidthsChange',
+      columnWidths,
+    });
   }
 
   private getState(): Partial<State> {
@@ -558,7 +604,7 @@ class WebviewController {
           isOnEnterTimeout = true;
           setTimeout(() => {
             isOnEnterTimeout = false;
-          }, 1000);
+          }, seconds(1));
           viewAndModelById.get(nodeId)?.view.key.plusButton.click();
           break;
 
@@ -640,15 +686,22 @@ class ViewModelRenderer {
   }
 
   renderPlistRowHeader(): HTMLHeadElement {
-    const columns = [
-      createElement('th', [], {innerHTML: '<b>Key</b>'}),
-      createElement('th', [], {innerHTML: '<b>Type</b>'}),
-      createElement('th', [], {innerHTML: '<b>Value</b>'}),
-    ];
-    columns[0].style.width = '30%';
-    columns[1].style.width = '10%';
-    const tableRow = createElement('tr', undefined, undefined, columns);
-    return createElement('thead', [CSS.plistRow], undefined, [tableRow]);
+    const key = createElement('th', [], {innerHTML: '<b>Key</b>'});
+    const type = createElement('th', [], {innerHTML: '<b>Type</b>'});
+    const value = createElement('th', [], {innerHTML: '<b>Value</b>'});
+    key.style.width = this.delegate.columnWidths.first ?? '30%';
+    type.style.width = this.delegate.columnWidths.second ?? '10%';
+
+    const tableRow = createElement('tr', undefined, undefined, [
+      key,
+      type,
+      value,
+    ]);
+    const tableHead = createElement('thead', [CSS.plistRow], undefined, [
+      tableRow,
+    ]);
+    this.watchColumnWidths(tableHead, key, type, value);
+    return tableHead;
   }
 
   private renderViewModelNode(
@@ -829,9 +882,33 @@ class ViewModelRenderer {
     };
   }
 
+  private watchColumnWidths(
+    container: HTMLTableSectionElement,
+    key: HTMLTableCellElement,
+    type: HTMLTableCellElement,
+    value: HTMLTableCellElement
+  ) {
+    let resizeEventLimiter: number | undefined;
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (resizeEventLimiter) return;
+
+      resizeEventLimiter = setTimeout(() => {
+        resizeEventLimiter = undefined;
+        const keyWidth = percentage(key.clientWidth, container.clientWidth);
+        const typeWidth = percentage(type.clientWidth, container.clientWidth);
+        this.delegate.columnWidths.update({first: keyWidth, second: typeWidth});
+      }, seconds(1)) as unknown as number;
+    });
+
+    for (const element of [key, type, value]) {
+      resizeObserver.observe(element);
+    }
+  }
+
   static flashErrorIndicator(element: HTMLElement): void {
     element.classList.add(CSS.errorFlash);
-    setTimeout(() => element.classList.remove(CSS.errorFlash), 1000);
+    setTimeout(() => element.classList.remove(CSS.errorFlash), seconds(1));
   }
 }
 
