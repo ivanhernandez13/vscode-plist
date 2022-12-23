@@ -125,6 +125,8 @@ interface WebviewState {
   selectedNodeId?: number;
   activeInputElement?: HTMLInputElement | HTMLSelectElement;
   columnWidths: ColumnWidths;
+  errorMessage?: string;
+  spacing?: string;
 }
 
 interface State {
@@ -135,14 +137,6 @@ interface State {
 const ROOT_NODE_ID = 0;
 const BODY_CONTENT = document.getElementById('bodyContent')!;
 const GENERATED_BANNER = document.getElementById('generatedBanner');
-
-function percentage(a: number, b: number): string {
-  return ((a / b) * 100).toFixed(0) + '%';
-}
-
-function seconds(num: number): number {
-  return num * 1000;
-}
 
 class WebviewController {
   private readonly vsCodeApi: VsCodeApi;
@@ -165,16 +159,16 @@ class WebviewController {
   constructor() {
     this.vsCodeApi = acquireVsCodeApi();
 
+    const webviewState = this.webviewState;
     const delegate: ViewModelRendererDelegate = {
-      isExpanded: (id: number) =>
-        this.webviewState.expandedNodeIds.includes(id),
-      isReadonly: () => this.webviewState?.isReadonly === true,
+      isExpanded: (id: number) => webviewState.expandedNodeIds.includes(id),
+      isReadonly: () => webviewState.isReadonly === true,
       columnWidths: {
         get first() {
-          return this.webview.columnWidths.first;
+          return webviewState.columnWidths.first;
         },
         get second() {
-          return this.webview.columnWidths.second;
+          return webviewState.columnWidths.second;
         },
         update: (arg: ColumnWidths) => {
           this.columnWidthsChanged({first: arg.first, second: arg.second});
@@ -240,9 +234,12 @@ class WebviewController {
         unsafeRestoredState.webview.columnWidths.first;
       this.webviewState.columnWidths.second =
         unsafeRestoredState.webview.columnWidths.second;
+      this.webviewState.spacing = unsafeRestoredState.webview.spacing;
     }
     if (unsafeRestoredState.viewModel) {
       this.renderWebviewBody(unsafeRestoredState.viewModel);
+    } else if (unsafeRestoredState.webview?.errorMessage) {
+      this.renderErrorBody(unsafeRestoredState.webview.errorMessage);
     }
   }
 
@@ -256,9 +253,11 @@ class WebviewController {
         this.webviewState.isReadonly = message.isReadonly;
         this.webviewState.columnWidths.first = message.columnWidths.first;
         this.webviewState.columnWidths.second = message.columnWidths.second;
+        this.setSpacing(message.spacing);
         this.renderBannerForGeneratedFiles();
         logger.info('onMessageReceived.renderViewModel', message.viewModel);
         this.renderWebviewBody(message.viewModel);
+        this.webviewState.errorMessage = undefined;
         this.saveState({
           viewModel: message.viewModel,
           webview: this.webviewState,
@@ -278,6 +277,14 @@ class WebviewController {
         this.collapseNodesChanged();
         this.renderWebviewFromSavedState();
         logger.info('onMessageReceived.collapseAll');
+        break;
+      case 'updateSpacing':
+        this.setSpacing(message.spacing);
+        break;
+      case 'renderError':
+        this.webviewState.errorMessage = message.errorMessage;
+        this.saveState({webview: this.webviewState});
+        this.renderErrorBody(message.errorMessage);
         break;
     }
   }
@@ -326,7 +333,7 @@ class WebviewController {
 
   private getState(): Partial<State> {
     try {
-      return JSON.parse(JSON.stringify(this.vsCodeApi.getState() ?? {}));
+      return deepCopy(this.vsCodeApi.getState() ?? {});
     } catch (err) {
       logger.error('this.vsCodeApi.getState', this.vsCodeApi.getState());
       return {};
@@ -342,6 +349,56 @@ class WebviewController {
     this.vsCodeApi.setState(newState);
   }
 
+  private renderErrorBody(errorMessage: string): void {
+    const errorIcon = createElement('span', ['codicon', 'codicon-error']);
+    errorIcon.style.fontSize = '48px';
+
+    const errorLink = createElement('a', ['monaco-link', 'error-div-link'], {
+      innerText: 'Open with Default Editor',
+      href: '#',
+    });
+
+    const elements = [
+      createDiv([errorIcon], 'error-icon-container'),
+      createElement('span', 'error-div-text', {
+        innerText:
+          'The plist editor could not be opened due to an unexpected error:\n' +
+          errorMessage,
+      }),
+      errorLink,
+    ];
+
+    errorLink.addEventListener('click', () => {
+      this.vsCodeApi.postMessage({command: 'openWithDefaultEditor'});
+    });
+
+    BODY_CONTENT.style.height = '100%';
+    BODY_CONTENT.replaceChildren(createDiv(elements, 'error-div'));
+  }
+
+  private setSpacing(spacing?: string): void {
+    this.webviewState.spacing = spacing;
+    this.saveState({webview: this.webviewState});
+
+    let padding: string;
+    switch (spacing) {
+      case 'spacious':
+        padding = '6px 0 6px 0';
+        break;
+      case 'comfortable':
+        padding = '3px 0 3px 0';
+        break;
+      case 'compact':
+      default:
+        padding = '';
+        break;
+    }
+
+    for (const tableCell of Array.from(document.getElementsByTagName('td'))) {
+      tableCell.style.padding = padding;
+    }
+  }
+
   private renderWebviewBody(rootPlistNode: ViewModel): void {
     this.rootPlistNode = rootPlistNode;
 
@@ -350,6 +407,7 @@ class WebviewController {
       this.viewModel.renderViewModel(rootPlistNode),
     ]);
     BODY_CONTENT.replaceChildren(table);
+    this.setSpacing(this.webviewState.spacing);
 
     const viewModels = Array.from(this.viewModel.viewAndViewModelById.values());
     this.configurePlistNodeEventListeners(viewModels);
@@ -689,6 +747,7 @@ class ViewModelRenderer {
     const key = createElement('th', [], {innerHTML: '<b>Key</b>'});
     const type = createElement('th', [], {innerHTML: '<b>Type</b>'});
     const value = createElement('th', [], {innerHTML: '<b>Value</b>'});
+
     key.style.width = this.delegate.columnWidths.first ?? '30%';
     type.style.width = this.delegate.columnWidths.second ?? '10%';
 
@@ -700,7 +759,9 @@ class ViewModelRenderer {
     const tableHead = createElement('thead', [CSS.plistRow], undefined, [
       tableRow,
     ]);
+
     this.watchColumnWidths(tableHead, key, type, value);
+
     return tableHead;
   }
 
@@ -992,6 +1053,18 @@ function arrayRemove<T>(arr: T[], value: T): boolean {
     return false;
   }
   return arr.splice(index, 1).length > 0;
+}
+
+function percentage(a: number, b: number): string {
+  return ((a / b) * 100).toFixed(0) + '%';
+}
+
+function seconds(num: number): number {
+  return num * 1000;
+}
+
+function deepCopy<T extends object>(obj: T): T {
+  return JSON.parse(JSON.stringify(obj));
 }
 
 function updateColorTheme() {

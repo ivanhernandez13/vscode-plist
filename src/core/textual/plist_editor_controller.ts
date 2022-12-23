@@ -1,11 +1,13 @@
 import * as vscode from 'vscode';
 import {SelfDisposing} from '../../common/utilities/self_disposing';
-import {EDITOR_COMMANDS} from '../commands';
+import {MANIFEST} from '../manifest';
 import {PlistWebviewController} from './plist_webview_controller';
 import {scopedMemento} from '../../common/utilities/scoped_memento';
 import {Debouncer} from '../../common/utilities/debouncer';
 import {logger} from '../../common/logging/extension_logger';
 import {StorageLocations} from '../../common/storage_location';
+import {replaceTab} from '../../common/utilities/tab';
+import {getConfiguration} from '../../common/utilities/vscode';
 
 function keyName(path: string, name: string): string {
   return `plistEditor:${path}.${name}`;
@@ -76,30 +78,45 @@ export class PlistEditorController
   private performRegistrations(): vscode.Disposable[] {
     const debouncedReload = new Debouncer(
       (e: vscode.TextDocumentChangeEvent) => {
-        const controller = this.webviewControllerByPath.get(
+        const webviewController = this.webviewControllerByPath.get(
           e.document.uri.path
         );
-        if (!controller) return;
+        if (!webviewController) return;
 
         const updatedContent = e.document.getText();
         if (!updatedContent) return;
 
-        controller.renderEditor(updatedContent);
+        webviewController.renderEditor(updatedContent);
       },
       500
     );
 
     return [
       vscode.workspace.onDidChangeConfiguration(e => {
-        if (!e.affectsConfiguration('binaryPlist.decoder')) return;
+        if (
+          !(
+            e.affectsConfiguration(MANIFEST.SETTINGS.binaryDecoder) ||
+            e.affectsConfiguration(MANIFEST.SETTINGS.spacing)
+          )
+        ) {
+          return;
+        }
 
-        for (const [
-          path,
-          controller,
-        ] of this.webviewControllerByPath.entries()) {
-          if (controller.docAttributes.isGenerated) {
+        if (e.affectsConfiguration(MANIFEST.SETTINGS.binaryDecoder)) {
+          const entries = this.webviewControllerByPath.entries();
+          for (const [path, controller] of entries) {
+            if (!controller.docAttributes.isGenerated) continue;
+
             controller.dispose();
             this.webviewControllerByPath.delete(path);
+          }
+        } else if (e.affectsConfiguration(MANIFEST.SETTINGS.spacing)) {
+          const controllers = this.webviewControllerByPath.values();
+          for (const controller of controllers) {
+            controller.panel.webview.postMessage({
+              command: 'updateSpacing',
+              spacing: getConfiguration(MANIFEST.SETTINGS.spacing),
+            });
           }
         }
       }),
@@ -111,29 +128,18 @@ export class PlistEditorController
         }
       ),
       vscode.commands.registerCommand(
-        EDITOR_COMMANDS.openWithDefaultEditor,
-        resource => {
-          vscode.commands.executeCommand(
-            EDITOR_COMMANDS.openWith,
-            resource,
-            'default'
-          );
-        }
+        MANIFEST.COMMANDS.openWithDefaultEditor,
+        resource => replaceTab(resource, resource, 'default')
       ),
       vscode.commands.registerCommand(
-        EDITOR_COMMANDS.openWithPlistEditor,
-        resource => {
-          vscode.commands.executeCommand(
-            EDITOR_COMMANDS.openWith,
-            resource,
-            PlistEditorController.viewType
-          );
-        }
+        MANIFEST.COMMANDS.openWithPlistEditor,
+        resource =>
+          replaceTab(resource, resource, PlistEditorController.viewType)
       ),
-      vscode.commands.registerCommand(EDITOR_COMMANDS.collapseAll, () =>
+      vscode.commands.registerCommand(MANIFEST.COMMANDS.collapseAll, () =>
         this.postCommandToActiveWebview('collapseAll')
       ),
-      vscode.commands.registerCommand(EDITOR_COMMANDS.expandAll, () =>
+      vscode.commands.registerCommand(MANIFEST.COMMANDS.expandAll, () =>
         this.postCommandToActiveWebview('expandAll')
       ),
       vscode.workspace.onDidChangeTextDocument(e => debouncedReload.run(e)),

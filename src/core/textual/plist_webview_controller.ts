@@ -1,15 +1,17 @@
 import * as vscode from 'vscode';
 
-import {SelfDisposing} from '../../common/utilities/self_disposing';
-import {PlainObject} from '../../common/utilities/object';
-import {ScopedMemento} from '../../common/utilities/scoped_memento';
-
 import {PlistEntry, PlistEntryType} from './model/plist_view_model';
-import {PlistOperations} from './plist_operations';
-import {arrayRemove} from '../../common/utilities/array';
-import {UriUtils} from '../../common/utilities/vscode';
-import {StorageLocations} from '../../common/storage_location';
+import {UriUtils, getConfiguration} from '../../common/utilities/vscode';
+
 import {BinaryPlistEditorController} from '../binary/binary_plist_editor_controller';
+import {MANIFEST} from '../manifest';
+import {PlainObject} from '../../common/utilities/object';
+import {PlistOperations} from './plist_operations';
+import {ScopedMemento} from '../../common/utilities/scoped_memento';
+import {SelfDisposing} from '../../common/utilities/self_disposing';
+import {StorageLocations} from '../../common/storage_location';
+import {arrayRemove} from '../../common/utilities/array';
+import {errorMessageOrToString} from '../binary/decoder/error';
 
 function entriesWithNumberOfChildren(
   node: PlistEntry,
@@ -81,11 +83,16 @@ export class PlistWebviewController extends SelfDisposing {
 
         this.operations.update();
 
+        const viewModel = await this.viewModelOrPostError();
+        if (!viewModel) return;
+
+        const spacing = getConfiguration(MANIFEST.SETTINGS.spacing);
         webview.postMessage({
           command: 'renderViewModel',
-          viewModel: await this.operations.viewModel,
+          viewModel,
           expandedNodes: this.persistentState.expandedNodes.get(),
           columnWidths: this.persistentState.columnWidths.get(),
+          spacing,
         });
       },
       this,
@@ -137,7 +144,8 @@ export class PlistWebviewController extends SelfDisposing {
       // whenever a node is added or removed.
       this.operations.reloadModel(updatedContent);
     }
-    const viewModel = await this.operations.viewModel;
+    const viewModel = await this.viewModelOrPostError();
+    if (!viewModel) return;
 
     if (!this.persistentState.expandedNodes.exists()) {
       const children: PlistEntry[] = [];
@@ -147,13 +155,27 @@ export class PlistWebviewController extends SelfDisposing {
       );
     }
 
+    const spacing = getConfiguration(MANIFEST.SETTINGS.spacing);
     this.panel.webview.postMessage({
       command: 'renderViewModel',
       viewModel,
       expandedNodes: this.persistentState.expandedNodes.get(),
       isReadonly: this.docAttributes.isReadonly,
       columnWidths: this.persistentState.columnWidths.get(),
+      spacing,
     });
+  }
+
+  private async viewModelOrPostError(): Promise<PlistEntry | undefined> {
+    try {
+      return await this.operations.viewModel;
+    } catch (err) {
+      this.panel.webview.postMessage({
+        command: 'renderError',
+        errorMessage: errorMessageOrToString(err),
+      });
+    }
+    return undefined;
   }
 
   private handleIncomingMessages(message: PlainObject): boolean {
@@ -237,6 +259,13 @@ export class PlistWebviewController extends SelfDisposing {
         break;
       }
 
+      case 'openWithDefaultEditor':
+        vscode.commands.executeCommand(
+          MANIFEST.COMMANDS.openWithDefaultEditor,
+          this.document.uri
+        );
+        break;
+
       default:
         break;
     }
@@ -259,17 +288,12 @@ export class PlistWebviewController extends SelfDisposing {
     scripts: vscode.Uri[];
     stylesheets: vscode.Uri[];
   }): string {
-    const htmlContents = [
-      `<!DOCTYPE html>
-      <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            ${this.renderScripts(external.scripts)}
-            ${this.renderStylesheets(external.stylesheets)}
-            <title>Webview</title>`,
-    ];
+    const head =
+      this.renderScripts(external.scripts) +
+      '\n' +
+      this.renderStylesheets(external.stylesheets);
 
+    let body = "<div id='bodyContent'></div>";
     if (this.docAttributes.isGenerated) {
       const title =
         'This is a generated file' +
@@ -277,15 +301,24 @@ export class PlistWebviewController extends SelfDisposing {
           ? ' and cannot be edited'
           : ', changes are automatically saved to the binary file') +
         '. Click to hide.';
-      htmlContents.push(`<div id='generatedBanner' title="${title}"></div>`);
+      body = `<div id='generatedBanner' title="${title}"></div>${body}`;
     }
 
-    htmlContents.push(`<div id='bodyContent'></div>
-        </head>
-        <body>
-        </body>
-      </html>`);
-
-    return htmlContents.join('\n');
+    return html(body, head);
   }
+}
+
+function html(body: string, head = ''): string {
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ${head}
+  <title>Webview</title>
+</head>
+<body>
+    ${body}
+</body>
+</html>`;
 }

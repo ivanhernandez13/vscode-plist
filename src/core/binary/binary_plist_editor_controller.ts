@@ -6,7 +6,7 @@ import {PlistEditorController} from '../textual/plist_editor_controller';
 import {replaceTab} from '../../common/utilities/tab';
 import {generatedFileUri} from '../../common/generated_files';
 import {isBinaryPlist} from './decoder/binary_plist_decoder';
-import {UriUtils} from '../../common/utilities/vscode';
+import {getConfiguration, UriUtils} from '../../common/utilities/vscode';
 import {isLocalMacOS} from 'host';
 import {generateTextualPlist, exportTextualPlist} from 'decoder';
 import {BinaryPlistDocument} from './binary_plist_document';
@@ -29,9 +29,7 @@ export class BinaryPlistEditorController
   static get usingMacosDecoder(): boolean {
     return (
       isLocalMacOS() &&
-      vscode.workspace
-        .getConfiguration('binaryPlist')
-        .get('decoder', 'plutil') === 'plutil'
+      getConfiguration('plist.binarySupport.decoder', 'plutil') === 'plutil'
     );
   }
 

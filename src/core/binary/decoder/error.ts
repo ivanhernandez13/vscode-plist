@@ -27,3 +27,19 @@ export class UnsupportedTagError extends Error {
     super(`${tag} tag is not supported`);
   }
 }
+
+/**
+ * Error thrown when parsing the contents of a binary plist file and finding a
+ * tag that is unsupported by version 00.
+ */
+export class PlistStructureError extends Error {
+  constructor(type: string) {
+    super(`${type} is not a supported type for a plist root value.`);
+  }
+}
+
+export function errorMessageOrToString(errorOrUnknown: unknown): string {
+  return errorOrUnknown instanceof Error
+    ? errorOrUnknown.message
+    : String(errorOrUnknown);
+}

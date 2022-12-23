@@ -1,27 +1,31 @@
 import * as vscode from 'vscode';
-import {EDITOR_COMMANDS} from '../../core/commands';
+import {MANIFEST} from '../../core/manifest';
 
 export async function replaceTab(
   replacee: vscode.Uri,
   replacer: vscode.Uri,
   viewType?: string
-) {
-  const targetTab = vscode.window.tabGroups.all
+): Promise<void> {
+  const viewColumn = findTab(replacee)?.group.viewColumn;
+  await vscode.commands.executeCommand(
+    MANIFEST.COMMANDS.openWith,
+    replacer,
+    viewType,
+    {viewColumn}
+  );
+
+  const targetTab = findTab(replacee);
+  if (targetTab) {
+    await vscode.window.tabGroups.close(targetTab);
+  }
+}
+
+function findTab(uri: vscode.Uri): vscode.Tab | undefined {
+  return vscode.window.tabGroups.all
     .flatMap(group => group.tabs)
     .find(
       tab =>
         tab.input !== undefined &&
-        (tab.input as {uri?: vscode.Uri}).uri?.path === replacee.path
+        (tab.input as {uri?: vscode.Uri}).uri?.path === uri.path
     );
-  if (targetTab) {
-    await vscode.window.tabGroups.close(targetTab);
-  }
-  await vscode.commands.executeCommand(
-    EDITOR_COMMANDS.openWith,
-    replacer,
-    viewType,
-    {
-      viewColumn: targetTab?.group.viewColumn,
-    }
-  );
 }

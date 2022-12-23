@@ -1,4 +1,5 @@
-import * as vscode from 'vscode';
+import {MANIFEST} from '../../core/manifest';
+import {getConfiguration} from '../utilities/vscode';
 import {ConsoleLogger} from './console_logger';
 import {Logger} from './logger';
 import {OutputChannelLogger} from './output_channel_logger';
@@ -7,7 +8,7 @@ class ExtensionLogger implements Logger {
   private readonly loggers: Logger[] = [];
 
   constructor() {
-    const logLevel = vscode.workspace.getConfiguration('logging').get('level');
+    const logLevel = getConfiguration(MANIFEST.SETTINGS.loggingLevel);
     if (logLevel) {
       this.loggers.push(
         new OutputChannelLogger('Plist Editor'),

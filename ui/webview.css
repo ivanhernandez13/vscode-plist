@@ -1,5 +1,7 @@
 :root {
   --chevron-expand-icon: url('icons/chevron-expand-dark.svg');
+  /* border: 3px solid pink; */
+  height: 99%;
 }
 
 body {
@@ -7,37 +9,46 @@ body {
   font-family: var(--vscode-editor-font-family);
   font-weight: var(--vscode-editor-font-weight);
   font-size: var(--vscode-editor-font-size);
+  /* border: 3px solid orange; */
+  height: 99%;
 }
 
 .opaque {
   visibility: hidden;
 }
+
 .hidden {
   display: none;
   visibility: hidden;
 }
+
 .hidden-conditionally {
   display: none;
   visibility: hidden;
 }
+
 .faded {
   filter: brightness(70%);
 }
+
 .float-right {
   display: flex;
   float: right;
   max-width: 15%;
 }
+
 .float-left {
   display: flex;
   float: left;
   max-width: 15%;
 }
+
 .float-center {
   display: flex;
   float: left;
   width: 100%;
 }
+
 .key-container {
   display: flex;
 }
@@ -51,9 +62,11 @@ body {
   font-weight: var(--vscode-editor-font-weight);
   font-size: var(--vscode-editor-font-size);
 }
+
 .input-as-label:focus {
   outline: none;
 }
+
 .focused-input-as-label {
   outline: none !important;
   width: 100%;
@@ -76,9 +89,11 @@ body {
   font-weight: var(--vscode-editor-font-weight);
   font-size: var(--vscode-editor-font-size);
 }
+
 .select-as-label:focus {
   outline: none;
 }
+
 .no-hide .select-as-label {
   background: var(--chevron-expand-icon);
   box-sizing: content-box;
@@ -90,19 +105,24 @@ body {
 .plist-row {
   opacity: initial;
 }
+
 .plist-row:hover:not(.plist-row-highlight) {
   background-color: var(--vscode-list-hoverBackground);
 }
+
 .plist-row:hover .hidden-conditionally {
   visibility: visible;
 }
+
 .plist-row-highlight {
   background-color: var(--vscode-list-inactiveSelectionBackground);
   border-color: var(--vscode-list-inactiveFocusOutline);
 }
+
 .plist-row-highlight .appearance-auto {
   appearance: auto;
 }
+
 .plist-row-button {
   background-color: transparent;
   border: none;
@@ -122,11 +142,13 @@ body {
   animation: fade 1s forwards;
   background-color: var(--vscode-list-errorForeground);
 }
+
 @keyframes fade {
   from {
     background-color: var(--vscode-list-errorForeground);
     opacity: 1;
   }
+
   to {
     background-color: var(--vscode-list-errorForeground);
     opacity: 0;
@@ -161,6 +183,7 @@ body {
   border-collapse: collapse;
   width: 100%;
 }
+
 .plist-table td,
 .plist-table thead th {
   padding: 0px 5px 0px 5px;
@@ -168,9 +191,11 @@ body {
   border-bottom: 1px solid;
   border-color: var(--vscode-menu-separatorBackground);
 }
+
 .plist-table thead tr {
   position: relative;
 }
+
 .plist-table thead th {
   position: sticky;
   top: 0;
@@ -179,4 +204,37 @@ body {
   min-width: 70px;
   background-color: var(--vscode-editor-background);
   z-index: 100;
+}
+
+.error-div {
+  width: 97%;
+  height: 97%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  padding: 0px 16px;
+  gap: 10px;
+  word-break: break-word;
+  text-align: center;
+}
+
+.error-div span {
+  font-size: 14px;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.error-icon-container {
+  color: var(--vscode-notificationsErrorIcon-foreground);
+  display: block;
+}
+
+.error-div-text {
+  color: var(--vscode-foreground);
+}
+
+.error-div-link {
+  font-size: 14px;
+  text-decoration: none;
 }

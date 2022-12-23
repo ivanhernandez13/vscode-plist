@@ -54,7 +54,17 @@
     "configuration": {
       "title": "Property List Editor",
       "properties": {
-        "binaryPlist.decoder": {
+        "plist.editor.spacing": {
+          "description": "The vertical spacing between entries.",
+          "default": "compact",
+          "enum": [
+            "compact",
+            "comfortable",
+            "spacious"
+          ],
+          "type": "string"
+        },
+        "plist.binarySupport.decoder": {
           "description": "The decoder to use when working with binary plists. This option is only supported on macOS as `plutil` is only available on macOS. All other platforms use the experimental extension decoder.",
           "default": "plutil",
           "enum": [
@@ -63,7 +73,7 @@
           ],
           "type": "string"
         },
-        "logging.level": {
+        "plist.logging.level": {
           "description": "The log level. Only enable for debugging.",
           "default": null,
           "enum": [
@@ -235,7 +245,7 @@
     "clean": "gts clean",
     "fix": "gts fix"
   },
-  "version": "0.1.3",
+  "version": "0.1.4",
   "extensionKind": [
     "ui",
     "workspace"
