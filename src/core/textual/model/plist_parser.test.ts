@@ -51,7 +51,7 @@ describe('Plist Parser', () => {
         id: 1,
         key: 'boolKey',
         type: 'Boolean',
-        value: '1',
+        value: 'YES',
         children: undefined,
         parent: 0,
       },
@@ -215,7 +215,7 @@ describe('Plist Parser', () => {
                 key: 'Item 2',
                 parent: 2,
                 type: 'Boolean',
-                value: '1',
+                value: 'YES',
               },
               {
                 children: undefined,

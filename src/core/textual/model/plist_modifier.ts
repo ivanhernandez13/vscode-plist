@@ -18,11 +18,6 @@ type ModelValue =
 // The default type of new plist entries.
 const DEFAULT_PLIST_TYPE: PlistEntryType = 'String';
 
-// function nextMapId(map: Map<number, unknown>): number {
-//   const keys = [...map.keys()].sort();
-//   return keys[keys.length - 1] + 1;
-// }
-
 /**
  * The brains behind the editor. This class manages converting between the model
  * representing the plist file and the view model that is displayed via the

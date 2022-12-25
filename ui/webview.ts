@@ -1,16 +1,55 @@
 'use strict';
 
-type WebviewLogSeverity = 'off' | 'trace' | 'info' | 'warn' | 'error';
+/* -------------------------------------------------------------------------- */
+/*                                   Logging                                  */
+/* -------------------------------------------------------------------------- */
+
+type WebviewLogSeverity = 'verbose' | 'info' | 'warn' | 'error';
+const EXTENSION_LOG_LEVEL = document.getElementById('extensionLogLevel')?.title;
+
 class WebviewLogger {
-  constructor(private severity: WebviewLogSeverity) {}
-  log(severity: WebviewLogSeverity, message: string, ...args: unknown[]) {
-    if (this.severity === 'off') return;
-    const severityStr = severity.toUpperCase();
+  constructor(private readonly severity?: string) {}
+
+  private get timestamp(): string {
+    const date = new Date();
+    return `${date.toLocaleDateString(
+      'en-US'
+    )} ${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()}`;
+  }
+
+  private processArgs(
+    severity: WebviewLogSeverity,
+    source: string,
+    message: string,
+    args: unknown[]
+  ): {[key: string]: unknown} {
+    let processedArgs: {[key: string]: unknown} = {};
+
+    if (args.length === 1) {
+      const arg = args[0];
+      processedArgs = typeof arg === 'object' ? {...arg} : {arg0: arg};
+    } else {
+      for (const [index, arg] of Object.entries(args)) {
+        processedArgs[`arg${index}`] = arg;
+      }
+    }
+
+    const timestamp = this.timestamp;
+    processedArgs.__context__ = {severity, timestamp, source, message};
+    return processedArgs;
+  }
+
+  private log(
+    severity: WebviewLogSeverity,
+    source: string,
+    message: string,
+    args: unknown[]
+  ) {
+    if (!this.severity) return;
     switch (severity) {
-      case 'trace':
-        if (this.severity !== 'trace') return;
-        console.trace(severityStr, message, ...args);
-        return;
+      case 'verbose':
+        if (this.severity !== 'verbose') return;
+        break;
       case 'info':
         if (['warn', 'error'].includes(this.severity)) return;
         break;
@@ -18,35 +57,71 @@ class WebviewLogger {
         if (['error'].includes(this.severity)) return;
         break;
       case 'error':
-        console.error(severityStr, message, ...args);
+        console.error(message, ...args);
         return;
       default:
         break;
     }
-    console.log(severityStr, message, ...args);
+
+    console.log(`[${source}]:`, message);
+    console.log(this.processArgs(severity, source, message, args));
   }
-  trace(message: string, ...args: unknown[]) {
-    this.log('trace', message, args);
+
+  verbose(source: string, message: string, ...args: unknown[]) {
+    this.log('verbose', source, message, args);
   }
-  info(message: string, ...args: unknown[]) {
-    this.log('info', message, args);
+  info(source: string, message: string, ...args: unknown[]) {
+    this.log('info', source, message, args);
   }
-  warn(message: string, ...args: unknown[]) {
-    this.log('warn', message, args);
+  warn(source: string, message: string, ...args: unknown[]) {
+    this.log('warn', source, message, args);
   }
-  error(message: string, ...args: unknown[]) {
-    this.log('error', message, args);
+  error(source: string, message: string, ...args: unknown[]) {
+    this.log('error', source, message, args);
   }
 }
-const logger = new WebviewLogger('info');
+const logger = new WebviewLogger(EXTENSION_LOG_LEVEL);
+logger.info('Logger', `Initiliazed with level '${EXTENSION_LOG_LEVEL}'`);
 
-interface VsCodeApi {
+/* -------------------------------------------------------------------------- */
+/*                             VSCode Webview API                             */
+/* -------------------------------------------------------------------------- */
+
+interface VsCodeApi<T extends object> {
   postMessage(msg: {}): void;
-  setState(state: {}): void;
-  getState(): {};
+  setState(state: T): void;
+  getState(): Partial<T>;
 }
 
-declare function acquireVsCodeApi(): VsCodeApi;
+declare function acquireVsCodeApi(): VsCodeApi<{}>;
+
+class VsCodeApiWrapper implements VsCodeApi<WebviewState> {
+  private readonly internalVSCodeApi = acquireVsCodeApi();
+
+  postMessage(msg: {command?: string}): void {
+    logger.verbose(
+      'VSCode Webview API',
+      `Outgoing message '${msg.command}'`,
+      msg
+    );
+    this.internalVSCodeApi.postMessage(msg);
+  }
+  setState(state: WebviewState): void {
+    logger.verbose('VSCode Webview API', 'Saving state', state);
+    this.internalVSCodeApi.setState(state);
+  }
+  getState(): Partial<WebviewState> {
+    const state = this.internalVSCodeApi.getState() ?? {};
+    logger.verbose('VSCode Webview API', 'Restoring state', state);
+    return state;
+  }
+}
+
+const vsCodeApi: VsCodeApi<WebviewState> = new VsCodeApiWrapper();
+
+/* -------------------------------------------------------------------------- */
+/*                         View/View Model Definitions                        */
+/* -------------------------------------------------------------------------- */
 
 const PLIST_ENTRY_TYPES_WITH_CHILDREN = ['Array', 'Dictionary'] as const;
 const PLIST_ENTRY_TYPES = [
@@ -75,12 +150,6 @@ interface ViewModel {
 interface ColumnWidths {
   first?: string;
   second?: string;
-}
-
-interface ViewModelRendererDelegate {
-  isExpanded(id: number): boolean;
-  isReadonly(): boolean;
-  columnWidths: ColumnWidths & {update(arg: ColumnWidths): void};
 }
 
 interface HTMLRowKey {
@@ -118,87 +187,130 @@ interface ViewAndViewModel {
   viewModel: ViewModel;
 }
 
-interface WebviewState {
-  isReadonly?: boolean;
-  expandedNodeIds: number[];
-  lastSelectedNodeId?: number;
-  selectedNodeId?: number;
+interface ViewState {
   activeInputElement?: HTMLInputElement | HTMLSelectElement;
   columnWidths: ColumnWidths;
   errorMessage?: string;
+  expandedNodeIds: number[];
+  isReadonly?: boolean;
+  lastSelectedNodeId?: number;
+  newlyInsertedNode?: number;
+  selectedNodeId?: number;
   spacing?: string;
 }
 
-interface State {
-  webview: WebviewState;
+interface WebviewState {
+  view: ViewState;
   viewModel: ViewModel;
 }
+
+const ROOT_PLIST_NODE: Readonly<ViewModel> = {
+  id: -1,
+  key: '<placeholder>',
+  type: 'String',
+  value: '<placeholder>',
+};
+
+/* -------------------------------------------------------------------------- */
+/*                               State Handling                               */
+/* -------------------------------------------------------------------------- */
+
+const EXTENSION_MONITORED_KEYS = ['columnWidths', 'expandedNodeIds'];
+/**
+ * State management system that handles:
+ *   - automatically saving changes made to the state object to the VS Code
+ *     webview state storage system.
+ *   - notifying the extension when any state property is modified that the
+ *     extension would be interested in.
+ */
+class StateManager implements WebviewState {
+  private readonly viewState: ViewState = {
+    expandedNodeIds: [],
+    isReadonly: false,
+    columnWidths: {},
+  };
+  private viewModelState: ViewModel = ROOT_PLIST_NODE;
+
+  private readonly stateSaver = new Debouncer(() => {
+    vsCodeApi.setState({
+      viewModel: this.viewModelState,
+      view: this.viewState,
+    });
+  }, seconds(1));
+
+  readonly view = this.initView();
+
+  get viewModel(): Readonly<ViewModel> {
+    return this.viewModelState;
+  }
+
+  constructor() {}
+
+  updateRoot(viewModel: ViewModel): void {
+    if (this.viewModel === viewModel) return;
+
+    this.viewModelState = viewModel;
+    this.stateSaver.run();
+  }
+
+  restore() {
+    const previousState = vsCodeApi.getState();
+    if (previousState.view) {
+      Object.assign(this.viewState, previousState.view);
+    }
+    if (previousState.viewModel) {
+      this.updateRoot(previousState.viewModel);
+    }
+  }
+
+  private initView() {
+    const debouncedSave = () => this.stateSaver.run();
+
+    return new Proxy(this.viewState, {
+      set(obj, key, newValue): boolean {
+        if (isDeepEqual(obj[key], newValue)) {
+          return true;
+        }
+
+        logger.verbose(
+          'State Manager',
+          `Updating view state for '${String(key)}'`,
+          {key, newValue, oldValue: obj[key]}
+        );
+        obj[key] = newValue;
+        debouncedSave();
+
+        if (EXTENSION_MONITORED_KEYS.includes(key as string)) {
+          vsCodeApi.postMessage({
+            command: 'webviewStateChanged',
+            payload: {key, newValue},
+          });
+        }
+
+        return true;
+      },
+    });
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                             Webview Controller                             */
+/* -------------------------------------------------------------------------- */
 
 const ROOT_NODE_ID = 0;
 const BODY_CONTENT = document.getElementById('bodyContent')!;
 const GENERATED_BANNER = document.getElementById('generatedBanner');
 
 class WebviewController {
-  private readonly vsCodeApi: VsCodeApi;
-  private readonly viewModel: ViewModelRenderer;
-  private readonly webviewState: WebviewState = {
-    expandedNodeIds: [],
-    isReadonly: false,
-    columnWidths: {},
-  };
-
-  private rootPlistNode: ViewModel = {
-    id: -1,
-    key: '<placeholder>',
-    type: 'String',
-    value: '<placeholder>',
-  };
-
-  private newlyInsertedNode: number | undefined;
+  private readonly state = new StateManager();
+  private readonly viewModel = new ViewModelRenderer(this.state.view);
 
   constructor() {
-    this.vsCodeApi = acquireVsCodeApi();
-
-    const webviewState = this.webviewState;
-    const delegate: ViewModelRendererDelegate = {
-      isExpanded: (id: number) => webviewState.expandedNodeIds.includes(id),
-      isReadonly: () => webviewState.isReadonly === true,
-      columnWidths: {
-        get first() {
-          return webviewState.columnWidths.first;
-        },
-        get second() {
-          return webviewState.columnWidths.second;
-        },
-        update: (arg: ColumnWidths) => {
-          this.columnWidthsChanged({first: arg.first, second: arg.second});
-        },
-      },
-    };
-
-    this.viewModel = new ViewModelRenderer(delegate);
     this.configureGlobalEventListeners();
-    this.renderWebviewFromSavedState();
+    this.restoreWebviewFromSavedState();
     this.renderBannerForGeneratedFiles();
-  }
-
-  private collectViewModels(
-    viewModel: ViewModel,
-    viewModels: ViewModel[]
-  ): void {
-    viewModels.push(viewModel);
-    for (const child of viewModel.children ?? []) {
-      this.collectViewModels(child, viewModels);
-    }
-  }
-
-  private allViewModelIds(): number[] {
-    const viewModels: ViewModel[] = [];
-    const currentState = this.getState();
-    if (currentState.viewModel) {
-      this.collectViewModels(currentState.viewModel, viewModels);
-    }
-    return viewModels.map(viewModel => viewModel.id);
+    this.watchAttributeMutations();
+    this.updateColorTheme();
   }
 
   private renderBannerForGeneratedFiles() {
@@ -216,139 +328,6 @@ class WebviewController {
     });
   }
 
-  private renderWebviewFromSavedState() {
-    const unsafeRestoredState: Partial<State> = this.getState() ?? {};
-    if (unsafeRestoredState.webview) {
-      this.webviewState.activeInputElement =
-        unsafeRestoredState.webview.activeInputElement;
-      this.webviewState.lastSelectedNodeId =
-        unsafeRestoredState.webview.lastSelectedNodeId;
-      this.webviewState.selectedNodeId =
-        unsafeRestoredState.webview.selectedNodeId;
-      this.webviewState.isReadonly = unsafeRestoredState.webview.isReadonly;
-      this.webviewState.expandedNodeIds.length = 0;
-      this.webviewState.expandedNodeIds.push(
-        ...unsafeRestoredState.webview.expandedNodeIds
-      );
-      this.webviewState.columnWidths.first =
-        unsafeRestoredState.webview.columnWidths.first;
-      this.webviewState.columnWidths.second =
-        unsafeRestoredState.webview.columnWidths.second;
-      this.webviewState.spacing = unsafeRestoredState.webview.spacing;
-    }
-    if (unsafeRestoredState.viewModel) {
-      this.renderWebviewBody(unsafeRestoredState.viewModel);
-    } else if (unsafeRestoredState.webview?.errorMessage) {
-      this.renderErrorBody(unsafeRestoredState.webview.errorMessage);
-    }
-  }
-
-  private onMessageReceived(e: MessageEvent): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const message: any = e.data;
-    switch (message.command) {
-      case 'renderViewModel':
-        this.webviewState.expandedNodeIds.length = 0;
-        this.webviewState.expandedNodeIds.push(...message.expandedNodes);
-        this.webviewState.isReadonly = message.isReadonly;
-        this.webviewState.columnWidths.first = message.columnWidths.first;
-        this.webviewState.columnWidths.second = message.columnWidths.second;
-        this.setSpacing(message.spacing);
-        this.renderBannerForGeneratedFiles();
-        logger.info('onMessageReceived.renderViewModel', message.viewModel);
-        this.renderWebviewBody(message.viewModel);
-        this.webviewState.errorMessage = undefined;
-        this.saveState({
-          viewModel: message.viewModel,
-          webview: this.webviewState,
-        });
-        break;
-      case 'expandAll':
-        this.webviewState.expandedNodeIds.length = 0;
-        this.webviewState.expandedNodeIds.push(...this.allViewModelIds());
-        this.collapseNodesChanged();
-        this.renderWebviewFromSavedState();
-        logger.info('onMessageReceived.expandAll');
-        break;
-      case 'collapseAll':
-        this.webviewState.expandedNodeIds.length = 0;
-        // Doesn't make sense to collapse the "Root" node.
-        this.webviewState.expandedNodeIds.push(0);
-        this.collapseNodesChanged();
-        this.renderWebviewFromSavedState();
-        logger.info('onMessageReceived.collapseAll');
-        break;
-      case 'updateSpacing':
-        this.setSpacing(message.spacing);
-        break;
-      case 'renderError':
-        this.webviewState.errorMessage = message.errorMessage;
-        this.saveState({webview: this.webviewState});
-        this.renderErrorBody(message.errorMessage);
-        break;
-    }
-  }
-
-  private addPlistNode(id: number): void {
-    this.vsCodeApi.postMessage({
-      command: 'viewModelAdd',
-      id,
-    });
-  }
-
-  private deletePlistNode(id: number): void {
-    this.vsCodeApi.postMessage({command: 'viewModelDelete', id});
-  }
-
-  private updatePlistNode(
-    kind: 'key' | 'type' | 'value',
-    id: number,
-    newValue: string
-  ): void {
-    this.vsCodeApi.postMessage({
-      command: 'updateViewModelNode',
-      kind,
-      id,
-      newValue,
-    });
-  }
-
-  private collapseNodesChanged(): void {
-    this.vsCodeApi.postMessage({
-      command: 'expandedNodesChange',
-      ids: this.webviewState.expandedNodeIds,
-    });
-    this.saveState({webview: this.webviewState});
-  }
-
-  private columnWidthsChanged(columnWidths: ColumnWidths): void {
-    this.webviewState.columnWidths.first = columnWidths.first;
-    this.webviewState.columnWidths.second = columnWidths.second;
-    this.saveState({webview: this.webviewState});
-    this.vsCodeApi.postMessage({
-      command: 'columnWidthsChange',
-      columnWidths,
-    });
-  }
-
-  private getState(): Partial<State> {
-    try {
-      return deepCopy(this.vsCodeApi.getState() ?? {});
-    } catch (err) {
-      logger.error('this.vsCodeApi.getState', this.vsCodeApi.getState());
-      return {};
-    }
-  }
-
-  private saveState(state: Partial<State>) {
-    const currentState = this.getState();
-    const newState = {
-      viewModel: state.viewModel ?? currentState.viewModel,
-      webview: state.webview ?? currentState.webview,
-    };
-    this.vsCodeApi.setState(newState);
-  }
-
   private renderErrorBody(errorMessage: string): void {
     const errorIcon = createElement('span', ['codicon', 'codicon-error']);
     errorIcon.style.fontSize = '48px';
@@ -356,6 +335,9 @@ class WebviewController {
     const errorLink = createElement('a', ['monaco-link', 'error-div-link'], {
       innerText: 'Open with Default Editor',
       href: '#',
+    });
+    errorLink.addEventListener('click', () => {
+      vsCodeApi.postMessage({command: 'openWithDefaultEditor'});
     });
 
     const elements = [
@@ -368,58 +350,132 @@ class WebviewController {
       errorLink,
     ];
 
-    errorLink.addEventListener('click', () => {
-      this.vsCodeApi.postMessage({command: 'openWithDefaultEditor'});
-    });
-
     BODY_CONTENT.style.height = '100%';
     BODY_CONTENT.replaceChildren(createDiv(elements, 'error-div'));
   }
 
-  private setSpacing(spacing?: string): void {
-    this.webviewState.spacing = spacing;
-    this.saveState({webview: this.webviewState});
-
-    let padding: string;
-    switch (spacing) {
-      case 'spacious':
-        padding = '6px 0 6px 0';
-        break;
-      case 'comfortable':
-        padding = '3px 0 3px 0';
-        break;
-      case 'compact':
-      default:
-        padding = '';
-        break;
-    }
-
-    for (const tableCell of Array.from(document.getElementsByTagName('td'))) {
-      tableCell.style.padding = padding;
+  private restoreWebviewFromSavedState() {
+    this.state.restore();
+    if (this.state.view.errorMessage) {
+      this.renderErrorBody(this.state.view.errorMessage);
+    } else {
+      this.renderWebviewBody(this.state.viewModel);
     }
   }
 
+  private collectViewModels(
+    viewModel: ViewModel,
+    viewModels: ViewModel[]
+  ): void {
+    viewModels.push(viewModel);
+    for (const child of viewModel.children ?? []) {
+      this.collectViewModels(child, viewModels);
+    }
+  }
+
+  private allViewModelIds(): number[] {
+    const viewModels: ViewModel[] = [];
+    this.collectViewModels(this.state.viewModel, viewModels);
+    return viewModels.map(viewModel => viewModel.id);
+  }
+
+  private onMessageReceived(e: MessageEvent): void {
+    const viewState = this.state.view;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const message: any = e.data;
+    logger.verbose(
+      'Webview Controller',
+      `Incoming message: ${message.command}`,
+      message
+    );
+    switch (message.command) {
+      case 'renderViewModel':
+        logger.info(
+          'Webview Controller',
+          'Rendering view model',
+          message.viewModel
+        );
+        viewState.errorMessage = undefined;
+        viewState.expandedNodeIds = message.expandedNodes;
+        viewState.isReadonly = message.isReadonly;
+        viewState.columnWidths = message.columnWidths;
+        this.viewModel.setSpacing(message.spacing);
+        this.renderBannerForGeneratedFiles();
+        this.renderWebviewBody(message.viewModel);
+        break;
+      case 'expandAll':
+        viewState.expandedNodeIds = this.allViewModelIds();
+        this.restoreWebviewFromSavedState();
+        break;
+      case 'collapseAll':
+        // Doesn't make sense to collapse the "Root" node.
+        viewState.expandedNodeIds = [0];
+        this.restoreWebviewFromSavedState();
+        break;
+      case 'updateSpacing':
+        this.viewModel.setSpacing(message.spacing);
+        break;
+      case 'renderError':
+        viewState.errorMessage = message.errorMessage;
+        this.renderErrorBody(message.errorMessage);
+        break;
+    }
+  }
+
+  private addPlistNode(id: number): void {
+    vsCodeApi.postMessage({
+      command: 'viewModelAdd',
+      id,
+    });
+  }
+
+  private deletePlistNode(id: number): void {
+    vsCodeApi.postMessage({command: 'viewModelDelete', id});
+  }
+
+  private updatePlistNode(
+    kind: 'key' | 'type' | 'value',
+    id: number,
+    newValue: string
+  ): void {
+    vsCodeApi.postMessage({
+      command: 'viewModelUpdate',
+      kind,
+      id,
+      newValue,
+    });
+  }
+
   private renderWebviewBody(rootPlistNode: ViewModel): void {
-    this.rootPlistNode = rootPlistNode;
+    this.state.updateRoot(rootPlistNode);
 
     const table = createElement('table', 'plist-table', undefined, [
       this.viewModel.renderPlistRowHeader(),
       this.viewModel.renderViewModel(rootPlistNode),
     ]);
     BODY_CONTENT.replaceChildren(table);
-    this.setSpacing(this.webviewState.spacing);
+    this.viewModel.setSpacing(this.state.view.spacing);
 
     const viewModels = Array.from(this.viewModel.viewAndViewModelById.values());
     this.configurePlistNodeEventListeners(viewModels);
 
-    const newNodeId = this.newlyInsertedNode;
-    this.newlyInsertedNode = undefined;
-    if (!newNodeId) return;
+    if (this.state.view.newlyInsertedNode) {
+      this.handleNewNode(this.state.view.newlyInsertedNode);
+    }
+  }
+
+  private handleNewNode(newNodeId: number) {
+    this.state.view.newlyInsertedNode = undefined;
 
     const viewAndModel = this.viewModel.viewAndViewModelById.get(newNodeId);
     if (!viewAndModel) return;
 
-    logger.info('renderWebviewBody.newlyInsertedNode', newNodeId, viewAndModel);
+    logger.info(
+      'Webview Controller',
+      'Handling newly inserted node',
+      newNodeId,
+      viewAndModel
+    );
     viewAndModel.view.value.element.dispatchEvent(
       new MouseEvent('dblclick', {bubbles: true, cancelable: false})
     );
@@ -432,8 +488,8 @@ class WebviewController {
     );
     for (const element of nodes) {
       element.classList.remove(CSS.plistRowHighlight);
-      this.webviewState.lastSelectedNodeId = this.webviewState.selectedNodeId;
-      this.webviewState.selectedNodeId = undefined;
+      this.state.view.lastSelectedNodeId = this.state.view.selectedNodeId;
+      this.state.view.selectedNodeId = undefined;
     }
 
     const noHideElements = Array.from(
@@ -442,6 +498,38 @@ class WebviewController {
     for (const button of noHideElements) {
       button.classList.remove(CSS.noHide);
     }
+  }
+
+  private updateColorTheme() {
+    if (document.body.classList.contains('vscode-light')) {
+      document.documentElement.style.setProperty(
+        '--chevron-expand-icon',
+        "url('icons/chevron-expand-light.svg')"
+      );
+    } else if (document.body.classList.contains('vscode-dark')) {
+      document.documentElement.style.setProperty(
+        '--chevron-expand-icon',
+        "url('icons/chevron-expand-dark.svg')"
+      );
+    } else if (document.body.classList.contains('vscode-high-contrast')) {
+      document.documentElement.style.setProperty(
+        '--chevron-expand-icon',
+        "url('icons/chevron-expand-high-contrast.svg')"
+      );
+    }
+  }
+
+  private watchAttributeMutations() {
+    new MutationObserver(mutationList => {
+      for (const mutation of mutationList) {
+        if (
+          mutation.type === 'attributes' &&
+          mutation.attributeName === 'class'
+        ) {
+          this.updateColorTheme();
+        }
+      }
+    }).observe(document.body, {attributes: true});
   }
 
   private configurePlistNodeEventListeners(
@@ -453,7 +541,8 @@ class WebviewController {
       view.container.addEventListener('click', () => {
         this.clearSelectedNode();
         setTimeout(() => {
-          if (!this.webviewState.isReadonly) {
+          if (!this.state.view.isReadonly) {
+            view.key.container.classList.add(CSS.noHide);
             view.key.plusButton.classList.add(CSS.noHide);
             view.key.minusButton?.classList.add(CSS.noHide);
             view.type.dropdown.parentElement?.classList.add(CSS.noHide);
@@ -462,27 +551,30 @@ class WebviewController {
             }
           }
           view.container.classList.add(CSS.plistRowHighlight);
-          this.webviewState.selectedNodeId = viewModel.id;
+          this.state.view.selectedNodeId = viewModel.id;
         });
       });
 
       view.key.expandButton.addEventListener('click', () => {
         view.isExpanded
-          ? arrayRemove(this.webviewState.expandedNodeIds, viewModel.id)
-          : this.webviewState.expandedNodeIds.push(viewModel.id);
-        this.collapseNodesChanged();
+          ? arrayRemove(this.state.view.expandedNodeIds, viewModel.id)
+          : this.state.view.expandedNodeIds.push(viewModel.id);
+        // Trigger the set proxy handler.
+        this.state.view.expandedNodeIds = deepCopy(
+          this.state.view.expandedNodeIds
+        );
         view.isExpanded = !view.isExpanded;
-        this.renderWebviewBody(this.rootPlistNode);
+        this.renderWebviewBody(this.state.viewModel);
 
         setTimeout(() => {
           this.viewModel.viewAndViewModelById
             .get(viewModel.id)
             ?.view.container.classList.add(CSS.plistRowHighlight);
-          this.webviewState.selectedNodeId = viewModel.id;
+          this.state.view.selectedNodeId = viewModel.id;
         });
       });
 
-      if (this.webviewState?.isReadonly) {
+      if (this.state.view?.isReadonly) {
         view.type.dropdown.disabled = true;
         view.key.plusButton.disabled = true;
         if (view.key.minusButton) {
@@ -496,15 +588,19 @@ class WebviewController {
       });
       view.key.plusButton.addEventListener('click', () => {
         this.addPlistNode(viewModel.id);
-        this.newlyInsertedNode = viewModel.id + 1;
-        logger.info('plusButton.click', this.newlyInsertedNode);
+        this.state.view.newlyInsertedNode = viewModel.id + 1;
+        logger.verbose(
+          'Webview Controller',
+          'Plus button was clicked and inserted new node',
+          this.state.view.newlyInsertedNode
+        );
       });
 
       view.type.dropdown.addEventListener('click', () => {
-        this.webviewState.activeInputElement = view.type.dropdown;
+        this.state.view.activeInputElement = view.type.dropdown;
       });
       view.type.dropdown.addEventListener('blur', () => {
-        this.webviewState.activeInputElement = undefined;
+        this.state.view.activeInputElement = undefined;
       });
       view.type.dropdown.addEventListener('change', event => {
         if (!(event.target instanceof HTMLSelectElement)) return;
@@ -523,7 +619,7 @@ class WebviewController {
           if ('readOnly' in inputBox) {
             inputBox.readOnly = false;
           }
-          this.webviewState.activeInputElement = inputBox;
+          this.state.view.activeInputElement = inputBox;
         });
         inputBox.addEventListener('blur', () => {
           inputBox.classList.add(CSS.inputAsLabel);
@@ -531,7 +627,7 @@ class WebviewController {
           if ('readOnly' in inputBox) {
             inputBox.readOnly = true;
           }
-          this.webviewState.activeInputElement = undefined;
+          this.state.view.activeInputElement = undefined;
 
           if (
             inputBox === view.key.inputBox &&
@@ -586,33 +682,33 @@ class WebviewController {
   }
 
   private configureGlobalEventListeners(): void {
-    const state = this.webviewState;
+    const viewState = this.state.view;
     let isOnEnterTimeout = false;
 
     document.addEventListener('keydown', event => {
-      if (state.activeInputElement) {
+      if (viewState.activeInputElement) {
         if (['Enter', 'Escape'].includes(event.code)) {
-          state.activeInputElement.blur();
+          viewState.activeInputElement.blur();
         }
 
         return;
       }
 
-      if (state.selectedNodeId === undefined) {
+      if (viewState.selectedNodeId === undefined) {
         if (event.code === 'ArrowUp') {
-          state.selectedNodeId = state.lastSelectedNodeId
-            ? state.lastSelectedNodeId + 1
+          viewState.selectedNodeId = viewState.lastSelectedNodeId
+            ? viewState.lastSelectedNodeId + 1
             : this.viewModel.viewAndViewModelById.size;
         } else if (event.code === 'ArrowDown') {
-          state.selectedNodeId = state.lastSelectedNodeId
-            ? state.lastSelectedNodeId - 1
+          viewState.selectedNodeId = viewState.lastSelectedNodeId
+            ? viewState.lastSelectedNodeId - 1
             : -1;
         } else {
           return;
         }
       }
 
-      const nodeId = state.selectedNodeId;
+      const nodeId = viewState.selectedNodeId;
       const viewAndModelById = this.viewModel.viewAndViewModelById;
 
       switch (event.code) {
@@ -656,7 +752,7 @@ class WebviewController {
 
         case 'Enter':
           if (isOnEnterTimeout) {
-            logger.warn('ignoring enter key');
+            logger.warn('Webview Controller', 'ignoring enter key');
             return;
           }
           isOnEnterTimeout = true;
@@ -675,8 +771,8 @@ class WebviewController {
           break;
 
         default:
-          logger.warn(event.code);
-          this.vsCodeApi.postMessage({
+          logger.warn('Webview Controller', event.code);
+          vsCodeApi.postMessage({
             command: 'searchOnType',
             code: event.code,
           });
@@ -694,32 +790,32 @@ class WebviewController {
   }
 }
 
-function getLargestKey<T>(dict: ReadonlyMap<T, unknown>): T {
-  return Array.from(dict.keys())
-    .sort((a, b) => (a < b ? -1 : 1))
-    .pop() as T;
-}
+/* -------------------------------------------------------------------------- */
+/*                              Webview Renderer                              */
+/* -------------------------------------------------------------------------- */
 
 enum CSS {
   opaque = 'opaque',
+  faded = 'faded',
   hidden = 'hidden',
   hiddenConditionally = 'hidden-conditionally',
-  faded = 'faded',
-  floatLeft = 'float-left',
-  floatCenter = 'float-center',
-  floatRight = 'float-right',
+  noHide = 'no-hide',
 
+  plistRow = 'plist-row',
+  plistRowHighlight = 'plist-row-highlight',
+
+  keyContainer = 'key-container',
+  keyContainerLeft = 'key-container-left',
+  keyContainerCenter = 'key-container-center',
+  keyContainerRight = 'key-container-right',
+  keyContainerButton = 'key-container-button',
+
+  expandCollapseButton = 'expand-collapse-button',
   inputAsLabel = 'input-as-label',
   focusedInputAsLabel = 'focused-input-as-label',
   selectAsLabel = 'select-as-label',
 
-  plistRow = 'plist-row',
-  plistRowHighlight = 'plist-row-highlight',
-  plistRowButton = 'plist-row-button',
-
-  expandCollapseButton = 'expand-collapse-button',
   errorFlash = 'error-flash',
-  noHide = 'no-hide',
 }
 
 class ViewModelRenderer {
@@ -729,7 +825,7 @@ class ViewModelRenderer {
     return this.viewAndViewModel;
   }
 
-  constructor(private readonly delegate: ViewModelRendererDelegate) {}
+  constructor(private readonly viewState: ViewState) {}
 
   renderViewModel(rootNode: ViewModel): HTMLTableSectionElement {
     this.viewAndViewModel.clear();
@@ -739,7 +835,10 @@ class ViewModelRenderer {
       undefined,
       this.renderViewModelNode(rootNode, 0)
     );
-    logger.log('info', `Rendered ${result.childElementCount} view models.`);
+    logger.info(
+      'View Renderer',
+      `Rendered ${result.childElementCount} view models.`
+    );
     return result;
   }
 
@@ -748,8 +847,8 @@ class ViewModelRenderer {
     const type = createElement('th', [], {innerHTML: '<b>Type</b>'});
     const value = createElement('th', [], {innerHTML: '<b>Value</b>'});
 
-    key.style.width = this.delegate.columnWidths.first ?? '30%';
-    type.style.width = this.delegate.columnWidths.second ?? '10%';
+    key.style.width = this.viewState.columnWidths.first ?? '30%';
+    type.style.width = this.viewState.columnWidths.second ?? '10%';
 
     const tableRow = createElement('tr', undefined, undefined, [
       key,
@@ -818,7 +917,7 @@ class ViewModelRenderer {
       createElement('td', undefined, undefined, [value.element]),
     ]);
 
-    const isExpanded = this.delegate.isExpanded(node.id);
+    const isExpanded = this.isExpanded(node.id);
     return {container: tableRow, key, type, value, isExpanded};
   }
 
@@ -887,10 +986,10 @@ class ViewModelRenderer {
     },
     indent: number
   ): HTMLRowKey {
-    const direction = this.delegate.isExpanded(id) ? 'down' : 'right';
+    const direction = this.isExpanded(id) ? 'down' : 'right';
     const expandButton = createElement('button', [
       CSS.expandCollapseButton,
-      CSS.plistRowButton,
+      CSS.keyContainerButton,
       'codicon',
       `codicon-chevron-${direction}`,
     ]);
@@ -904,19 +1003,19 @@ class ViewModelRenderer {
     }
 
     const minusButton = createElement('button', [
-      CSS.plistRowButton,
+      CSS.keyContainerButton,
       'codicon',
       'codicon-remove',
-      this.delegate.isReadonly() || !options.showMinus
+      this.viewState.isReadonly || !options.showMinus
         ? CSS.hidden
         : CSS.hiddenConditionally,
     ]);
 
     const plusButton = createElement('button', [
-      CSS.plistRowButton,
+      CSS.keyContainerButton,
       'codicon',
       'codicon-add',
-      this.delegate.isReadonly() ? CSS.hidden : CSS.hiddenConditionally,
+      this.viewState.isReadonly ? CSS.hidden : CSS.hiddenConditionally,
     ]);
 
     const indentLabel = createElement('label');
@@ -930,17 +1029,38 @@ class ViewModelRenderer {
     }
     rightSideButtons.push(plusButton);
 
-    const right = createDiv(rightSideButtons, CSS.floatRight);
-    const center = createDiv([label], CSS.floatCenter);
-    const left = createDiv([indentLabel, expandButton], CSS.floatLeft);
+    const left = createDiv([indentLabel, expandButton], CSS.keyContainerLeft);
+    const center = createDiv([label], CSS.keyContainerCenter);
+    const right = createDiv(rightSideButtons, CSS.keyContainerRight);
 
     return {
-      container: createDiv([left, center, right], 'key-container'),
+      container: createDiv([left, center, right], CSS.keyContainer),
       plusButton,
       minusButton: options.showMinus ? minusButton : undefined,
       expandButton,
       inputBox: label,
     };
+  }
+
+  setSpacing(spacing?: string): void {
+    this.viewState.spacing = spacing;
+
+    let padding = '';
+    switch (spacing) {
+      case 'spacious':
+        padding = '6px 0 6px 0';
+        break;
+      case 'comfortable':
+        padding = '3px 0 3px 0';
+        break;
+      case 'compact':
+      default:
+        break;
+    }
+
+    for (const tableCell of Array.from(document.getElementsByTagName('td'))) {
+      tableCell.style.padding = padding;
+    }
   }
 
   private watchColumnWidths(
@@ -949,17 +1069,17 @@ class ViewModelRenderer {
     type: HTMLTableCellElement,
     value: HTMLTableCellElement
   ) {
-    let resizeEventLimiter: number | undefined;
+    const debouncedUpdate = new Debouncer(() => {
+      // Can't calculate percentages without the denominator.
+      if (!container.clientWidth) return;
+
+      const first = percent(key.clientWidth, container.clientWidth);
+      const second = percent(type.clientWidth, container.clientWidth);
+      this.viewState.columnWidths = {first: `${first}%`, second: `${second}%`};
+    }, seconds(1));
 
     const resizeObserver = new ResizeObserver(() => {
-      if (resizeEventLimiter) return;
-
-      resizeEventLimiter = setTimeout(() => {
-        resizeEventLimiter = undefined;
-        const keyWidth = percentage(key.clientWidth, container.clientWidth);
-        const typeWidth = percentage(type.clientWidth, container.clientWidth);
-        this.delegate.columnWidths.update({first: keyWidth, second: typeWidth});
-      }, seconds(1)) as unknown as number;
+      debouncedUpdate.run();
     });
 
     for (const element of [key, type, value]) {
@@ -967,11 +1087,19 @@ class ViewModelRenderer {
     }
   }
 
+  private isExpanded(id: number): boolean {
+    return this.viewState.expandedNodeIds.includes(id);
+  }
+
   static flashErrorIndicator(element: HTMLElement): void {
     element.classList.add(CSS.errorFlash);
     setTimeout(() => element.classList.remove(CSS.errorFlash), seconds(1));
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/*                            HTML Helper Functions                           */
+/* -------------------------------------------------------------------------- */
 
 type HTMLElementTag = keyof HTMLElementTagNameMap;
 type ResolvedHTMLElement<T extends HTMLElementTag> = HTMLElementTagNameMap[T];
@@ -1025,6 +1153,10 @@ function createInputAsLabel(
   return inputElement;
 }
 
+/* -------------------------------------------------------------------------- */
+/*               Other Helper Constants, Functions, Classes, etc              */
+/* -------------------------------------------------------------------------- */
+
 const CHAR_CODES = {
   zero: '0'.charCodeAt(0),
   nine: '9'.charCodeAt(0),
@@ -1040,7 +1172,7 @@ function isHexString(str: string): boolean {
     const isNumber = charCode >= CHAR_CODES.zero && charCode <= CHAR_CODES.nine;
     const isLowerAlpha = charCode >= CHAR_CODES.a && charCode <= CHAR_CODES.f;
     const isUpperAlpha = charCode >= CHAR_CODES.A && charCode <= CHAR_CODES.F;
-    if (!isNumber && !isLowerAlpha && !isUpperAlpha) {
+    if (!(isNumber || isLowerAlpha || isUpperAlpha)) {
       return false;
     }
   }
@@ -1055,8 +1187,8 @@ function arrayRemove<T>(arr: T[], value: T): boolean {
   return arr.splice(index, 1).length > 0;
 }
 
-function percentage(a: number, b: number): string {
-  return ((a / b) * 100).toFixed(0) + '%';
+function percent(a: number, b: number): number {
+  return ((a / b) * 100) | 0;
 }
 
 function seconds(num: number): number {
@@ -1067,33 +1199,71 @@ function deepCopy<T extends object>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
 }
 
-function updateColorTheme() {
-  if (document.body.classList.contains('vscode-light')) {
-    document.documentElement.style.setProperty(
-      '--chevron-expand-icon',
-      "url('icons/chevron-expand-light.svg')"
+function getLargestKey<T>(dict: ReadonlyMap<T, unknown>): T {
+  return Array.from(dict.keys())
+    .sort((a, b) => (a < b ? -1 : 1))
+    .pop() as T;
+}
+
+/**
+ * Triple equality operator for string, number and boolean primitives.
+ * Recursive triple equality operator for the elements of arrays and objects.
+ * Does not properly consider types other than string, number, boolean, arrays
+ * and objects.
+ */
+function isDeepEqual(a: unknown, b: unknown): boolean {
+  if (typeof a !== typeof b) {
+    return true;
+  }
+
+  if (['string', 'number', 'boolean'].includes(typeof a)) {
+    return a === b;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const anyB: any = b;
+  if (Array.isArray(a)) {
+    if (a.length !== anyB.length) {
+      return false;
+    }
+    // NOTE: doesn't consider order of entries
+    return a.every((value, index) => isDeepEqual(value, anyB[index]));
+  } else if (typeof a === 'object') {
+    if (a === null) {
+      return b === null;
+    }
+    const aEntries = Object.entries(a);
+    if (aEntries.length !== Object.entries(anyB).length) {
+      return false;
+    }
+    return Object.entries(a).every((value, index) =>
+      isDeepEqual(value, anyB[index])
     );
-  } else if (document.body.classList.contains('vscode-dark')) {
-    document.documentElement.style.setProperty(
-      '--chevron-expand-icon',
-      "url('icons/chevron-expand-dark.svg')"
-    );
-  } else if (document.body.classList.contains('vscode-high-contrast')) {
-    document.documentElement.style.setProperty(
-      '--chevron-expand-icon',
-      "url('icons/chevron-expand-high-contrast.svg')"
-    );
+  }
+
+  return a === b;
+}
+
+class Debouncer {
+  private timeout?: number;
+
+  constructor(
+    private readonly action: () => void | Promise<void>,
+    private readonly delay: number
+  ) {}
+
+  run(): void {
+    if (this.timeout) return;
+
+    this.timeout = setTimeout(() => {
+      this.timeout = undefined;
+      this.action();
+    }, this.delay) as unknown as number;
   }
 }
 
-new MutationObserver(mutationList => {
-  for (const mutation of mutationList) {
-    if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-      updateColorTheme();
-    }
-  }
-}).observe(document.body, {attributes: true});
+/* -------------------------------------------------------------------------- */
+/*                                    Main                                    */
+/* -------------------------------------------------------------------------- */
 
-updateColorTheme();
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const webviewUI = new WebviewController();
+new WebviewController();

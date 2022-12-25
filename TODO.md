@@ -1,7 +1,13 @@
 ### TODO
 
+MVP
+
 - Add tests for:
+  - Editing node's type updates the value accordingly.
   - Adding/Removing nodes does not affect expansion state of other nodes.
+
+M1
+
 - Update the model in place.
 - Update the view in place.
 

@@ -12,6 +12,7 @@ import {SelfDisposing} from '../../common/utilities/self_disposing';
 import {StorageLocations} from '../../common/storage_location';
 import {arrayRemove} from '../../common/utilities/array';
 import {errorMessageOrToString} from '../binary/decoder/error';
+import {logger} from '../../common/logging/extension_logger';
 
 function entriesWithNumberOfChildren(
   node: PlistEntry,
@@ -68,12 +69,12 @@ export class PlistWebviewController extends SelfDisposing {
     webview.html = this.renderHTML({
       scripts: [getWebviewUri('webview.js')],
       stylesheets: [
-        getWebviewUri('webview.css'),
         getWebviewUri('codicon.css', [
           'node_modules',
           '@vscode/codicons',
           'dist',
         ]),
+        getWebviewUri('webview.css'),
       ],
     });
 
@@ -211,7 +212,7 @@ export class PlistWebviewController extends SelfDisposing {
         return false;
       }
 
-      case 'updateViewModelNode':
+      case 'viewModelUpdate':
         if (typeof message.id !== 'number') {
           break;
         } else if (typeof message.kind !== 'string') {
@@ -239,23 +240,12 @@ export class PlistWebviewController extends SelfDisposing {
         }
         break;
 
-      case 'expandedNodesChange':
-        if (Array.isArray(message.ids)) {
-          this.persistentState.expandedNodes.update(message.ids);
-        }
-        break;
-
-      case 'searchOnType':
-        // TODO: Figure out how to make find first instance.
-        // vscode.commands.executeCommand('editor.action.webvieweditor.showFind');
-        break;
-
-      case 'columnWidthsChange': {
-        const columnWidths = message.columnWidths as {
-          first?: string;
-          second?: string;
+      case 'webviewStateChanged': {
+        const payload = message.payload as {
+          key: string;
+          newValue: unknown;
         };
-        this.persistentState.columnWidths.update(columnWidths);
+        this.handleWebviewStateChange(payload.key, payload.newValue);
         break;
       }
 
@@ -266,19 +256,57 @@ export class PlistWebviewController extends SelfDisposing {
         );
         break;
 
+      case 'searchOnType':
+        // TODO: Figure out how to make find first instance.
+        // vscode.commands.executeCommand('editor.action.webvieweditor.showFind');
+        break;
+
       default:
         break;
     }
     return false;
   }
 
+  private handleWebviewStateChange(key: string, value: unknown): void {
+    switch (key) {
+      case 'columnWidths': {
+        const columnWidths = value as {
+          first?: string;
+          second?: string;
+        };
+        this.persistentState.columnWidths.update(columnWidths);
+        break;
+      }
+      case 'expandedNodeIds': {
+        if (!Array.isArray(value)) {
+          logger.logError(
+            `Receieved webview state change message for ${key} with unexpected value ${String(
+              value
+            )}.`
+          );
+          return;
+        }
+
+        this.persistentState.expandedNodes.update(value);
+        break;
+      }
+      default:
+        logger.logWarning(
+          `Receieved webview state change message for unexpected key '${key}'.`
+        );
+        break;
+    }
+  }
+
   private renderScripts(scripts: vscode.Uri[]): string {
+    if (!scripts.length) return '';
     return scripts
       .map(s => `<script type="module" src="${s}"></script>`)
       .join('<br>');
   }
 
   private renderStylesheets(stylesheets: vscode.Uri[]): string {
+    if (!stylesheets.length) return '';
     return stylesheets
       .map(s => `<link rel="stylesheet" href="${s}">`)
       .join('<br>');
@@ -294,6 +322,10 @@ export class PlistWebviewController extends SelfDisposing {
       this.renderStylesheets(external.stylesheets);
 
     let body = "<div id='bodyContent'></div>";
+    const logLevel = getConfiguration(MANIFEST.SETTINGS.loggingLevel);
+    if (typeof logLevel === 'string') {
+      body += `<span id='extensionLogLevel' title='${logLevel}' hidden></span>`;
+    }
     if (this.docAttributes.isGenerated) {
       const title =
         'This is a generated file' +

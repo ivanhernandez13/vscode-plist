@@ -4,7 +4,7 @@ export class Debouncer<T> {
   private args: T[] = [];
 
   constructor(
-    private readonly action: (...args: T[]) => void,
+    private readonly action: (...args: T[]) => void | Promise<void>,
     private readonly delay: number
   ) {}
 

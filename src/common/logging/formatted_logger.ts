@@ -16,20 +16,24 @@ export abstract class FormattedLogger implements Logger {
 
   private formatMessage(
     message: string,
-    level: 'Info' | 'Warning' | 'Error'
+    level: 'INFO' | 'WARN' | 'ERROR' | 'VERBOSE'
   ): string {
-    return `[${this.timestamp}]: [${level}] ${message}`;
+    return `${this.timestamp} | ${level} | ${message}`;
   }
 
   logInfo(message: string): void {
-    this.log(this.formatMessage(message, 'Info'));
+    this.log(this.formatMessage(message, 'INFO'));
   }
 
   logWarning(message: string): void {
-    this.log(this.formatMessage(message, 'Warning'));
+    this.log(this.formatMessage(message, 'WARN'));
   }
 
   logError(message: string): void {
-    this.log(this.formatMessage(message, 'Error'));
+    this.log(this.formatMessage(message, 'ERROR'));
+  }
+
+  logVerbose(message: string): void {
+    this.log(this.formatMessage(message, 'VERBOSE'));
   }
 }

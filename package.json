@@ -77,9 +77,10 @@
           "description": "The log level. Only enable for debugging.",
           "default": null,
           "enum": [
-            "error",
+            "verbose",
             "info",
-            "warning"
+            "warning",
+            "error"
           ],
           "type": "string"
         }
