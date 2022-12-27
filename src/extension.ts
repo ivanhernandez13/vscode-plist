@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
 
-import {ProvisioningProfileEditorController} from 'provisioning_profile_editor_controller';
+import {ProvisioningProfileEditorProvider} from 'provisioning_profile_editor_provider';
 import {StorageLocations} from './common/storage_location';
-import {BinaryPlistEditorController} from './core/binary/binary_plist_editor_controller';
+import {BinaryPlistEditorProvider} from './core/binary/binary_plist_editor_provider';
 import {GeneratedFileTracker} from './core/binary/generated_file_tracker';
 import {MANIFEST} from './core/manifest';
-import {PlistEditorController} from './core/textual/plist_editor_controller';
+import {PlistEditorProvider} from './core/textual/plist_editor_provider';
 
 /** Called by VS Code when the extension is activated. */
 export async function activate(context: vscode.ExtensionContext) {
@@ -13,16 +13,16 @@ export async function activate(context: vscode.ExtensionContext) {
   const storageLocations = await createWorkspaceStorage(baseStorageLocation);
 
   context.subscriptions.push(
-    new PlistEditorController(
+    new PlistEditorProvider(
       context.extensionUri,
       context.workspaceState,
       storageLocations
     ),
-    new BinaryPlistEditorController(
+    new BinaryPlistEditorProvider(
       storageLocations.bplist,
       new GeneratedFileTracker()
     ),
-    new ProvisioningProfileEditorController(storageLocations.mobileprovision),
+    new ProvisioningProfileEditorProvider(storageLocations.mobileprovision),
     vscode.commands.registerCommand(MANIFEST.COMMANDS.clearCaches, () =>
       clearCaches(context.workspaceState)
     )

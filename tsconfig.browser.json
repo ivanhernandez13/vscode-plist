@@ -1,12 +1,14 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
+    "lib": ["dom", "es2020"],
     "paths": {
       "host": ["./src/common/utilities/browser/host"],
-      "provisioning_profile_editor_controller": [
-        "./src/core/mobileprovision/browser/provisioning_profile_editor_controller"
+      "provisioning_profile_editor_provider": [
+        "./src/core/mobileprovision/browser/provisioning_profile_editor_provider"
       ],
-      "decoder": ["./src/core/binary/browser/decoder"]
+      "decoder": ["./src/core/binary/browser/decoder"],
+      "hash": ["./src/common/utilities/browser/hash"]
     }
   },
   "exclude": ["**/node/*"]

@@ -8,6 +8,25 @@ const webpack = require('webpack');
 //@ts-check
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
 
+const PLACEHOLDER = '__NODE_OR_BROWSER__';
+
+const ALIAS_PATHS = [
+  `src/core/binary/${PLACEHOLDER}/decoder`,
+  `src/common/utilities/${PLACEHOLDER}/host`,
+  `src/common/utilities/${PLACEHOLDER}/hash`,
+  `src/core/mobileprovision/${PLACEHOLDER}/provisioning_profile_editor_provider`,
+];
+
+function aliases(browserOrNode) {
+  const aliases = {};
+  for (const alias of ALIAS_PATHS) {
+    const basename = path.basename(alias);
+    const relativePath = alias.replace(PLACEHOLDER, browserOrNode);
+    aliases[basename] = path.resolve(__dirname, relativePath);
+  }
+  return aliases;
+}
+
 const browserConfig = /** @type WebpackConfig */ {
   context: __dirname,
   mode: 'none', // this leaves the source code as close as possible to the original (when packaging we set this to 'production')
@@ -24,14 +43,7 @@ const browserConfig = /** @type WebpackConfig */ {
   resolve: {
     mainFields: ['browser', 'module', 'main'], // look for `browser` entry point in imported node modules
     extensions: ['.ts', '.js'], // support ts-files and js-files
-    alias: {
-      decoder: path.resolve(__dirname, 'src/core/binary/browser/decoder'),
-      host: path.resolve(__dirname, 'src/common/utilities/browser/host'),
-      provisioning_profile_editor_controller: path.resolve(
-        __dirname,
-        'src/core/mobileprovision/browser/provisioning_profile_editor_controller'
-      ),
-    },
+    alias: aliases('browser'),
     fallback: {
       // Webpack 5 no longer polyfills Node.js core modules automatically.
       // see https://webpack.js.org/configuration/resolve/#resolvefallback
@@ -68,8 +80,7 @@ const browserConfig = /** @type WebpackConfig */ {
   devtool: 'nosources-source-map', // create a source map that points to the original source file
 };
 
-/** @type WebpackConfig */
-const nodeConfig = {
+const nodeConfig = /** @type WebpackConfig */ {
   target: 'node', // vscode extensions run in a Node.js-context 📖 -> https://webpack.js.org/configuration/node/
   mode: 'none', // this leaves the source code as close as possible to the original (when packaging we set this to 'production')
 
@@ -86,14 +97,7 @@ const nodeConfig = {
   resolve: {
     // support reading TypeScript and JavaScript files, 📖 -> https://github.com/TypeStrong/ts-loader
     extensions: ['.ts', '.js'],
-    alias: {
-      decoder: path.resolve(__dirname, 'src/core/binary/node/decoder'),
-      host: path.resolve(__dirname, 'src/common/utilities/node/host'),
-      provisioning_profile_editor_controller: path.resolve(
-        __dirname,
-        'src/core/mobileprovision/node/provisioning_profile_editor_controller'
-      ),
-    },
+    alias: aliases('node'),
   },
   module: {
     rules: [

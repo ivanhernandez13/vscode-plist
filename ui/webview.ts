@@ -99,20 +99,16 @@ class VsCodeApiWrapper implements VsCodeApi<WebviewState> {
   private readonly internalVSCodeApi = acquireVsCodeApi();
 
   postMessage(msg: {command?: string}): void {
-    logger.verbose(
-      'VSCode Webview API',
-      `Outgoing message '${msg.command}'`,
-      msg
-    );
+    logger.info('VSCode Webview API', `Outgoing message '${msg.command}'`, msg);
     this.internalVSCodeApi.postMessage(msg);
   }
   setState(state: WebviewState): void {
-    logger.verbose('VSCode Webview API', 'Saving state', state);
+    logger.info('VSCode Webview API', 'Saving state', state);
     this.internalVSCodeApi.setState(state);
   }
   getState(): Partial<WebviewState> {
     const state = this.internalVSCodeApi.getState() ?? {};
-    logger.verbose('VSCode Webview API', 'Restoring state', state);
+    logger.info('VSCode Webview API', 'Restoring state', state);
     return state;
   }
 }
@@ -180,6 +176,7 @@ interface HTMLRow {
   type: HTMLRowType;
   value: HTMLRowValue;
   isExpanded: boolean;
+  indentation: number;
 }
 
 interface ViewAndViewModel {
@@ -216,6 +213,7 @@ const ROOT_PLIST_NODE: Readonly<ViewModel> = {
 /* -------------------------------------------------------------------------- */
 
 const EXTENSION_MONITORED_KEYS = ['columnWidths', 'expandedNodeIds'];
+const NOISY_KEYS = ['lastSelectedNodeId', 'selectedNodeId'];
 /**
  * State management system that handles:
  *   - automatically saving changes made to the state object to the VS Code
@@ -268,19 +266,27 @@ class StateManager implements WebviewState {
 
     return new Proxy(this.viewState, {
       set(obj, key, newValue): boolean {
+        const keyStr = String(key);
         if (isDeepEqual(obj[key], newValue)) {
+          logger.verbose(
+            'State Manager',
+            `Skipped updating view state for '${keyStr}'`,
+            {key, newValue, oldValue: obj[key]}
+          );
           return true;
         }
 
-        logger.verbose(
-          'State Manager',
-          `Updating view state for '${String(key)}'`,
-          {key, newValue, oldValue: obj[key]}
-        );
+        const source = 'State Manager';
+        const message = `Updating view state for '${keyStr}'`;
+        const args = {key, newValue, oldValue: obj[key]};
+        NOISY_KEYS.includes(keyStr)
+          ? logger.verbose(source, message, args)
+          : logger.info(source, message, args);
+
         obj[key] = newValue;
         debouncedSave();
 
-        if (EXTENSION_MONITORED_KEYS.includes(key as string)) {
+        if (EXTENSION_MONITORED_KEYS.includes(keyStr)) {
           vsCodeApi.postMessage({
             command: 'webviewStateChanged',
             payload: {key, newValue},
@@ -303,7 +309,7 @@ const GENERATED_BANNER = document.getElementById('generatedBanner');
 
 class WebviewController {
   private readonly state = new StateManager();
-  private readonly viewModel = new ViewModelRenderer(this.state.view);
+  private readonly renderer = new ViewModelRenderer(this.state.view);
 
   constructor() {
     this.configureGlobalEventListeners();
@@ -311,6 +317,7 @@ class WebviewController {
     this.renderBannerForGeneratedFiles();
     this.watchAttributeMutations();
     this.updateColorTheme();
+    this.state.view.activeInputElement = undefined;
   }
 
   private renderBannerForGeneratedFiles() {
@@ -356,11 +363,19 @@ class WebviewController {
 
   private restoreWebviewFromSavedState() {
     this.state.restore();
-    if (this.state.view.errorMessage) {
-      this.renderErrorBody(this.state.view.errorMessage);
-    } else {
-      this.renderWebviewBody(this.state.viewModel);
+    this.state.view.errorMessage
+      ? this.renderErrorBody(this.state.view.errorMessage)
+      : this.renderWebviewBody(this.state.viewModel);
+  }
+
+  private collectViewAndViewModels(viewModel: ViewModel): ViewAndViewModel[] {
+    const viewModels = [viewModel];
+    for (const child of viewModel.children ?? []) {
+      this.collectViewModels(child, viewModels);
     }
+    return viewModels
+      .map(n => this.renderer.viewAndViewModelById.get(n.id))
+      .filter((n): n is ViewAndViewModel => n !== undefined);
   }
 
   private collectViewModels(
@@ -383,7 +398,7 @@ class WebviewController {
     const viewState = this.state.view;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const message: any = e.data;
-    logger.verbose(
+    logger.info(
       'Webview Controller',
       `Incoming message: ${message.command}`,
       message
@@ -399,7 +414,7 @@ class WebviewController {
         viewState.expandedNodeIds = message.expandedNodes;
         viewState.isReadonly = message.isReadonly;
         viewState.columnWidths = message.columnWidths;
-        this.viewModel.setSpacing(message.spacing);
+        this.renderer.setSpacing(message.spacing);
         this.renderBannerForGeneratedFiles();
         this.renderWebviewBody(message.viewModel);
         break;
@@ -413,7 +428,7 @@ class WebviewController {
         this.restoreWebviewFromSavedState();
         break;
       case 'updateSpacing':
-        this.viewModel.setSpacing(message.spacing);
+        this.renderer.setSpacing(message.spacing);
         break;
       case 'renderError':
         viewState.errorMessage = message.errorMessage;
@@ -450,13 +465,13 @@ class WebviewController {
     this.state.updateRoot(rootPlistNode);
 
     const table = createElement('table', 'plist-table', undefined, [
-      this.viewModel.renderPlistRowHeader(),
-      this.viewModel.renderViewModel(rootPlistNode),
+      this.renderer.renderPlistRowHeader(),
+      this.renderer.renderViewModel(rootPlistNode),
     ]);
     BODY_CONTENT.replaceChildren(table);
-    this.viewModel.setSpacing(this.state.view.spacing);
+    this.renderer.setSpacing(this.state.view.spacing);
 
-    const viewModels = Array.from(this.viewModel.viewAndViewModelById.values());
+    const viewModels = Array.from(this.renderer.viewAndViewModelById.values());
     this.configurePlistNodeEventListeners(viewModels);
 
     if (this.state.view.newlyInsertedNode) {
@@ -467,7 +482,7 @@ class WebviewController {
   private handleNewNode(newNodeId: number) {
     this.state.view.newlyInsertedNode = undefined;
 
-    const viewAndModel = this.viewModel.viewAndViewModelById.get(newNodeId);
+    const viewAndModel = this.renderer.viewAndViewModelById.get(newNodeId);
     if (!viewAndModel) return;
 
     logger.info(
@@ -519,6 +534,24 @@ class WebviewController {
     }
   }
 
+  private reloadNode(node: ViewAndViewModel) {
+    this.removeChildren(node.viewModel);
+    this.renderer.reloadPlistRow(node);
+
+    const viewAndViewModels = this.collectViewAndViewModels(node.viewModel);
+    this.configurePlistNodeEventListeners(viewAndViewModels);
+  }
+
+  private removeChildren(viewModel: ViewModel) {
+    if (!viewModel.children) return;
+
+    for (const child of viewModel.children) {
+      this.removeChildren(child);
+      const childNode = this.renderer.viewAndViewModelById.get(child.id);
+      childNode?.view.container.remove();
+    }
+  }
+
   private watchAttributeMutations() {
     new MutationObserver(mutationList => {
       for (const mutation of mutationList) {
@@ -533,9 +566,9 @@ class WebviewController {
   }
 
   private configurePlistNodeEventListeners(
-    viewModels: ViewAndViewModel[]
+    viewAndViewModels: ViewAndViewModel[]
   ): void {
-    for (const viewAndModel of viewModels) {
+    for (const viewAndModel of viewAndViewModels) {
       const {view, viewModel} = viewAndModel;
 
       view.container.addEventListener('click', () => {
@@ -564,10 +597,11 @@ class WebviewController {
           this.state.view.expandedNodeIds
         );
         view.isExpanded = !view.isExpanded;
-        this.renderWebviewBody(this.state.viewModel);
+        // this.renderWebviewBody(this.state.viewModel);
+        this.reloadNode(viewAndModel);
 
         setTimeout(() => {
-          this.viewModel.viewAndViewModelById
+          this.renderer.viewAndViewModelById
             .get(viewModel.id)
             ?.view.container.classList.add(CSS.plistRowHighlight);
           this.state.view.selectedNodeId = viewModel.id;
@@ -635,7 +669,7 @@ class WebviewController {
           ) {
             const parentId = viewModel.parent;
             if (parentId !== undefined) {
-              const siblings = viewModels.find(
+              const siblings = viewAndViewModels.find(
                 vm => vm.viewModel.id === parentId
               )?.viewModel.children;
               if (siblings?.find(s => s.key === inputBox.value)) {
@@ -686,6 +720,10 @@ class WebviewController {
     let isOnEnterTimeout = false;
 
     document.addEventListener('keydown', event => {
+      logger.verbose(
+        'Webview Controller',
+        `Handling keyboard input ${event.code}`
+      );
       if (viewState.activeInputElement) {
         if (['Enter', 'Escape'].includes(event.code)) {
           viewState.activeInputElement.blur();
@@ -698,7 +736,7 @@ class WebviewController {
         if (event.code === 'ArrowUp') {
           viewState.selectedNodeId = viewState.lastSelectedNodeId
             ? viewState.lastSelectedNodeId + 1
-            : this.viewModel.viewAndViewModelById.size;
+            : this.renderer.viewAndViewModelById.size;
         } else if (event.code === 'ArrowDown') {
           viewState.selectedNodeId = viewState.lastSelectedNodeId
             ? viewState.lastSelectedNodeId - 1
@@ -709,7 +747,7 @@ class WebviewController {
       }
 
       const nodeId = viewState.selectedNodeId;
-      const viewAndModelById = this.viewModel.viewAndViewModelById;
+      const viewAndModelById = this.renderer.viewAndViewModelById;
 
       switch (event.code) {
         case 'ArrowUp':
@@ -722,7 +760,7 @@ class WebviewController {
           }
           break;
         case 'ArrowDown': {
-          const largestId = getLargestKey(this.viewModel.viewAndViewModelById);
+          const largestId = getLargestKey(this.renderer.viewAndViewModelById);
           for (let id = nodeId + 1; id <= largestId; id++) {
             const next = viewAndModelById.get(id);
             if (next) {
@@ -771,11 +809,10 @@ class WebviewController {
           break;
 
         default:
-          logger.warn('Webview Controller', event.code);
-          vsCodeApi.postMessage({
-            command: 'searchOnType',
-            code: event.code,
-          });
+          // vsCodeApi.postMessage({
+          //   command: 'searchOnType',
+          //   code: event.code,
+          // });
           break;
       }
     });
@@ -885,6 +922,19 @@ class ViewModelRenderer {
     return elements;
   }
 
+  reloadPlistRow(node: ViewAndViewModel): void {
+    const [newRow, ...children] = this.renderViewModelNode(
+      node.viewModel,
+      node.view.indentation
+    );
+    node.view.container.replaceWith(newRow);
+    newRow.after(...children);
+    logger.info(
+      'View Renderer',
+      `Rendered ${children.length + 1} view models.`
+    );
+  }
+
   private renderPlistRow(
     node: ViewModel,
     indent = 0,
@@ -916,9 +966,15 @@ class ViewModelRenderer {
       createElement('td', undefined, undefined, [type.dropdown]),
       createElement('td', undefined, undefined, [value.element]),
     ]);
-
     const isExpanded = this.isExpanded(node.id);
-    return {container: tableRow, key, type, value, isExpanded};
+    return {
+      container: tableRow,
+      key,
+      type,
+      value,
+      isExpanded,
+      indentation: indent,
+    };
   }
 
   private renderPlistType(
@@ -1212,36 +1268,35 @@ function getLargestKey<T>(dict: ReadonlyMap<T, unknown>): T {
  * and objects.
  */
 function isDeepEqual(a: unknown, b: unknown): boolean {
-  if (typeof a !== typeof b) {
+  if (a === b) {
     return true;
   }
 
-  if (['string', 'number', 'boolean'].includes(typeof a)) {
-    return a === b;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (Array.isArray(a) && Array.isArray(b)) {
+    if (a.length !== b.length) {
+      return false;
+    }
+
+    // NOTE: doesn't consider order of entries
+    return a.every((value, index) => isDeepEqual(value, b[index]));
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const anyB: any = b;
-  if (Array.isArray(a)) {
-    if (a.length !== anyB.length) {
+  if (typeof a === 'object' && typeof b === 'object') {
+    if (a === null || b === null) {
+      return a === b;
+    } else if (a.constructor.name !== b.constructor.name) {
       return false;
     }
-    // NOTE: doesn't consider order of entries
-    return a.every((value, index) => isDeepEqual(value, anyB[index]));
-  } else if (typeof a === 'object') {
-    if (a === null) {
-      return b === null;
-    }
+
     const aEntries = Object.entries(a);
-    if (aEntries.length !== Object.entries(anyB).length) {
-      return false;
-    }
-    return Object.entries(a).every((value, index) =>
-      isDeepEqual(value, anyB[index])
+    return (
+      aEntries.length === Object.entries(b).length &&
+      aEntries.every((value, index) => isDeepEqual(value, b[index]))
     );
   }
 
-  return a === b;
+  return false;
 }
 
 class Debouncer {

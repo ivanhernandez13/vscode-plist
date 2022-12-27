@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-export class ProvisioningProfileEditorController
+export class ProvisioningProfileEditorProvider
   implements vscode.CustomReadonlyEditorProvider
 {
   /* eslint-disable @typescript-eslint/no-unused-vars */

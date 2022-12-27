@@ -1,8 +1,8 @@
 export type LogSeverity = 'info' | 'warning' | 'error' | 'verbose';
 
 export interface Logger {
-  logInfo(msg: string): void;
-  logWarning(msg: string): void;
-  logError(msg: string): void;
-  logVerbose(msg: string): void;
+  info(msg: string, args: unknown[]): void;
+  warning(msg: string, args: unknown[]): void;
+  error(msg: string, args: unknown[]): void;
+  verbose(msg: string, args: unknown[]): void;
 }

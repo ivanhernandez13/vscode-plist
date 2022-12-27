@@ -1,6 +1,6 @@
 /** Limits the number of times an action will run in a given interval. */
 export class Debouncer<T> {
-  private timeout?: NodeJS.Timeout;
+  private timeout?: NodeJS.Timeout | number;
   private args: T[] = [];
 
   constructor(

@@ -19,40 +19,40 @@ class ExtensionLogger implements Logger {
     }
   }
 
-  logInfo(msg: string): void {
-    this.logAll(msg, 'info');
+  info(msg: string, ...args: unknown[]): void {
+    this.logAll(msg, 'info', args);
   }
 
-  logWarning(msg: string): void {
-    this.logAll(msg, 'warning');
+  warning(msg: string, ...args: unknown[]): void {
+    this.logAll(msg, 'warning', args);
   }
 
-  logError(msg: string): void {
-    this.logAll(msg, 'error');
+  error(msg: string, ...args: unknown[]): void {
+    this.logAll(msg, 'error', args);
   }
 
-  logVerbose(msg: string): void {
-    this.logAll(msg, 'verbose');
+  verbose(msg: string, ...args: unknown[]): void {
+    this.logAll(msg, 'verbose', args);
   }
 
-  private logAll(msg: string, severity: LogSeverity): void {
+  private logAll(msg: string, severity: LogSeverity, args: unknown[]): void {
     if (!this.severity) return;
     for (const logger of this.loggers) {
       switch (severity) {
         case 'verbose':
           if (this.severity !== 'verbose') return;
-          logger.logVerbose(msg);
+          logger.verbose(msg, args);
           break;
         case 'info':
           if (['warn', 'error'].includes(this.severity)) return;
-          logger.logInfo(msg);
+          logger.info(msg, args);
           break;
         case 'warning':
           if (['error'].includes(this.severity)) return;
-          logger.logWarning(msg);
+          logger.warning(msg, args);
           break;
         case 'error':
-          logger.logError(msg);
+          logger.error(msg, args);
           break;
         default:
           continue;

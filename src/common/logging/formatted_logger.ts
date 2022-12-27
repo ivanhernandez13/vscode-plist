@@ -12,7 +12,7 @@ export abstract class FormattedLogger implements Logger {
     )} ${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()}`;
   }
 
-  abstract log(msg: string): void;
+  abstract log(msg: string, args: unknown[]): void;
 
   private formatMessage(
     message: string,
@@ -21,19 +21,19 @@ export abstract class FormattedLogger implements Logger {
     return `${this.timestamp} | ${level} | ${message}`;
   }
 
-  logInfo(message: string): void {
-    this.log(this.formatMessage(message, 'INFO'));
+  info(message: string, args: unknown[]): void {
+    this.log(this.formatMessage(message, 'INFO'), args);
   }
 
-  logWarning(message: string): void {
-    this.log(this.formatMessage(message, 'WARN'));
+  warning(message: string, args: unknown[]): void {
+    this.log(this.formatMessage(message, 'WARN'), args);
   }
 
-  logError(message: string): void {
-    this.log(this.formatMessage(message, 'ERROR'));
+  error(message: string, args: unknown[]): void {
+    this.log(this.formatMessage(message, 'ERROR'), args);
   }
 
-  logVerbose(message: string): void {
-    this.log(this.formatMessage(message, 'VERBOSE'));
+  verbose(message: string, args: unknown[]): void {
+    this.log(this.formatMessage(message, 'VERBOSE'), args);
   }
 }

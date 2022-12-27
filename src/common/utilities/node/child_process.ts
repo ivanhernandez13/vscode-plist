@@ -10,7 +10,7 @@ export async function checkOutput(
   preserveNewlines = false
 ): Promise<string> {
   const fullCommand = `${command} ${args.join(' ')}`;
-  logger.logInfo(`Running '${fullCommand}'`);
+  logger.info(`Running '${fullCommand}'`);
   return new Promise((resolve, reject) => {
     const pendingProcess = child_process.exec(
       fullCommand,

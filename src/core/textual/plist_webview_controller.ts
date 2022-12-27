@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import {PlistEntry, PlistEntryType} from './model/plist_view_model';
 import {UriUtils, getConfiguration} from '../../common/utilities/vscode';
 
-import {BinaryPlistEditorController} from '../binary/binary_plist_editor_controller';
+import {BinaryPlistEditorProvider} from '../binary/binary_plist_editor_provider';
 import {MANIFEST} from '../manifest';
 import {PlainObject} from '../../common/utilities/object';
 import {PlistOperations} from './plist_operations';
@@ -13,6 +13,7 @@ import {StorageLocations} from '../../common/storage_location';
 import {arrayRemove} from '../../common/utilities/array';
 import {errorMessageOrToString} from '../binary/decoder/error';
 import {logger} from '../../common/logging/extension_logger';
+import {sha256} from 'hash';
 
 function entriesWithNumberOfChildren(
   node: PlistEntry,
@@ -26,6 +27,22 @@ function entriesWithNumberOfChildren(
   }
   for (const child of node.children) {
     entriesWithNumberOfChildren(child, count, result);
+  }
+}
+
+class TextDocumentContent {
+  private contentHash?: string;
+
+  constructor(private readonly document: vscode.TextDocument) {}
+
+  private calculateContentHash(): Promise<string> {
+    return sha256(this.document.getText());
+  }
+
+  async contentHasChanged(): Promise<boolean> {
+    const lastContentHash = this.contentHash;
+    this.contentHash = await this.calculateContentHash();
+    return lastContentHash !== this.contentHash;
   }
 }
 
@@ -43,6 +60,8 @@ export class PlistWebviewController extends SelfDisposing {
     readonly isReadonly: boolean;
   };
 
+  private readonly content: TextDocumentContent;
+
   constructor(
     private readonly document: vscode.TextDocument,
     readonly panel: vscode.WebviewPanel,
@@ -54,6 +73,7 @@ export class PlistWebviewController extends SelfDisposing {
     }
   ) {
     super();
+    this.content = new TextDocumentContent(document);
     this.operations = new PlistOperations(document);
     this.disposables.push(this.operations);
     this.docAttributes = this.calculateDocAttributes();
@@ -82,19 +102,14 @@ export class PlistWebviewController extends SelfDisposing {
       async m => {
         if (!this.handleIncomingMessages(m)) return;
 
-        this.operations.update();
+        await this.operations.update();
 
         const viewModel = await this.viewModelOrPostError();
         if (!viewModel) return;
 
-        const spacing = getConfiguration(MANIFEST.SETTINGS.spacing);
-        webview.postMessage({
-          command: 'renderViewModel',
-          viewModel,
-          expandedNodes: this.persistentState.expandedNodes.get(),
-          columnWidths: this.persistentState.columnWidths.get(),
-          spacing,
-        });
+        if (await this.content.contentHasChanged()) {
+          this.postRenderViewModel(viewModel);
+        }
       },
       this,
       this.disposables
@@ -130,7 +145,7 @@ export class PlistWebviewController extends SelfDisposing {
       this.storageLocations.mobileprovision.path === documentDir ||
       // Binary plists can only be edited when the decoder is plutil which is
       // only available on local macOS clients.
-      (isGenerated && !BinaryPlistEditorController.usingMacosDecoder);
+      (isGenerated && !BinaryPlistEditorProvider.usingMacosDecoder);
     return {isGenerated, isReadonly};
   }
 
@@ -156,6 +171,12 @@ export class PlistWebviewController extends SelfDisposing {
       );
     }
 
+    if (await this.content.contentHasChanged()) {
+      this.postRenderViewModel(viewModel);
+    }
+  }
+
+  private postRenderViewModel(viewModel: PlistEntry): void {
     const spacing = getConfiguration(MANIFEST.SETTINGS.spacing);
     this.panel.webview.postMessage({
       command: 'renderViewModel',
@@ -279,7 +300,7 @@ export class PlistWebviewController extends SelfDisposing {
       }
       case 'expandedNodeIds': {
         if (!Array.isArray(value)) {
-          logger.logError(
+          logger.error(
             `Receieved webview state change message for ${key} with unexpected value ${String(
               value
             )}.`
@@ -291,7 +312,7 @@ export class PlistWebviewController extends SelfDisposing {
         break;
       }
       default:
-        logger.logWarning(
+        logger.warning(
           `Receieved webview state change message for unexpected key '${key}'.`
         );
         break;

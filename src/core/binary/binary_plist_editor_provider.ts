@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 
 import {SelfDisposing} from '../../common/utilities/self_disposing';
 import {GeneratedFileTracker} from './generated_file_tracker';
-import {PlistEditorController} from '../textual/plist_editor_controller';
+import {PlistEditorProvider} from '../textual/plist_editor_provider';
 import {replaceTab} from '../../common/utilities/tab';
 import {generatedFileUri} from '../../common/generated_files';
 import {isBinaryPlist} from './decoder/binary_plist_decoder';
@@ -20,7 +20,7 @@ import {BinaryPlistDocument} from './binary_plist_document';
  * custom text editors when a binary file is opened even if it matches the
  * supported file extension.
  */
-export class BinaryPlistEditorController
+export class BinaryPlistEditorProvider
   extends SelfDisposing
   implements vscode.CustomReadonlyEditorProvider<BinaryPlistDocument>
 {
@@ -60,7 +60,7 @@ export class BinaryPlistEditorController
         await generateTextualPlist(
           document,
           token,
-          BinaryPlistEditorController.usingMacosDecoder
+          BinaryPlistEditorProvider.usingMacosDecoder
         );
         webviewPanel.webview.html = `Readable plist was generated at ${document.generatedUri}.`;
       } catch (err) {
@@ -78,7 +78,7 @@ export class BinaryPlistEditorController
       await replaceTab(
         document.uri,
         document.generatedUri ?? document.uri,
-        PlistEditorController.viewType
+        PlistEditorProvider.viewType
       );
     });
   }
@@ -86,14 +86,14 @@ export class BinaryPlistEditorController
   private performRegistrations(): vscode.Disposable[] {
     const registrations = [
       vscode.window.registerCustomEditorProvider(
-        BinaryPlistEditorController.viewType,
+        BinaryPlistEditorProvider.viewType,
         this
       ),
     ];
     if (isLocalMacOS()) {
       registrations.push(
         vscode.workspace.onDidSaveTextDocument(asciiDoc => {
-          if (!BinaryPlistEditorController.usingMacosDecoder) return;
+          if (!BinaryPlistEditorProvider.usingMacosDecoder) return;
 
           const uri = this.tracker.generatedFiles.get(asciiDoc.uri);
           if (uri) {

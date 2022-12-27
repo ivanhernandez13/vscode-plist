@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+
 import {SelfDisposing} from '../../common/utilities/self_disposing';
 import {MANIFEST} from '../manifest';
 import {PlistWebviewController} from './plist_webview_controller';
@@ -14,7 +15,7 @@ function keyName(path: string, name: string): string {
 }
 
 /** Registers a custom textual editor for property list files. */
-export class PlistEditorController
+export class PlistEditorProvider
   extends SelfDisposing
   implements vscode.CustomTextEditorProvider
 {
@@ -77,16 +78,12 @@ export class PlistEditorController
 
   private performRegistrations(): vscode.Disposable[] {
     const debouncedReload = new Debouncer(
-      (e: vscode.TextDocumentChangeEvent) => {
-        const webviewController = this.webviewControllerByPath.get(
-          e.document.uri.path
-        );
+      async (e: vscode.TextDocumentChangeEvent) => {
+        const docPath = e.document.uri.path;
+        const webviewController = this.webviewControllerByPath.get(docPath);
         if (!webviewController) return;
 
-        const updatedContent = e.document.getText();
-        if (!updatedContent) return;
-
-        webviewController.renderEditor(updatedContent);
+        webviewController.renderEditor(e.document.getText());
       },
       500
     );
@@ -121,7 +118,7 @@ export class PlistEditorController
         }
       }),
       vscode.window.registerCustomEditorProvider(
-        PlistEditorController.viewType,
+        PlistEditorProvider.viewType,
         this,
         {
           webviewOptions: {enableFindWidget: true},
@@ -133,8 +130,7 @@ export class PlistEditorController
       ),
       vscode.commands.registerCommand(
         MANIFEST.COMMANDS.openWithPlistEditor,
-        resource =>
-          replaceTab(resource, resource, PlistEditorController.viewType)
+        resource => replaceTab(resource, resource, PlistEditorProvider.viewType)
       ),
       vscode.commands.registerCommand(MANIFEST.COMMANDS.collapseAll, () =>
         this.postCommandToActiveWebview('collapseAll')
@@ -149,13 +145,13 @@ export class PlistEditorController
   private async postCommandToActiveWebview(command: string): Promise<boolean> {
     const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
     if (!(activeTab instanceof vscode.TabInputCustom)) {
-      logger.logWarning('Active tab is not a custom editor.');
+      logger.warning('Active tab is not a custom editor.');
       return false;
     }
 
     const controller = this.webviewControllerByPath.get(activeTab.uri.path);
     if (!controller) {
-      logger.logWarning('Active tab does not have a webview controller.');
+      logger.warning('Active tab does not have a webview controller.');
       return false;
     }
 

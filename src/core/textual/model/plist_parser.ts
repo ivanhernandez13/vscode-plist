@@ -65,7 +65,7 @@ export class PlistParser {
     });
     this.viewModelMap.set(rootId, rootEntry);
 
-    logger.logInfo(`Parsed ${this.nextId - 1} view models.`);
+    logger.info(`Parsed ${this.nextId - 1} view models.`);
     return rootEntry;
   }
 

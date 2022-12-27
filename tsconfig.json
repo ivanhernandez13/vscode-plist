@@ -3,10 +3,11 @@
   "compilerOptions": {
     "paths": {
       "host": ["./src/common/utilities/node/host"],
-      "provisioning_profile_editor_controller": [
-        "./src/core/mobileprovision/node/provisioning_profile_editor_controller"
+      "provisioning_profile_editor_provider": [
+        "./src/core/mobileprovision/node/provisioning_profile_editor_provider"
       ],
-      "decoder": ["./src/core/binary/node/decoder"]
+      "decoder": ["./src/core/binary/node/decoder"],
+      "hash": ["./src/common/utilities/node/hash"]
     }
   },
   "exclude": ["**/browser/*"]
