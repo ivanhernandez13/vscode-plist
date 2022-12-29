@@ -1,18 +1,13 @@
 import * as vscode from 'vscode';
 
-import {SelfDisposing} from '../../common/utilities/self_disposing';
+import {SelfDisposing} from '../../common/utilities/disposable';
 import {MANIFEST} from '../manifest';
 import {PlistWebviewController} from './plist_webview_controller';
-import {scopedMemento} from '../../common/utilities/scoped_memento';
 import {Debouncer} from '../../common/utilities/debouncer';
 import {logger} from '../../common/logging/extension_logger';
 import {StorageLocations} from '../../common/storage_location';
 import {replaceTab} from '../../common/utilities/tab';
 import {getConfiguration} from '../../common/utilities/vscode';
-
-function keyName(path: string, name: string): string {
-  return `plistEditor:${path}.${name}`;
-}
 
 /** Registers a custom textual editor for property list files. */
 export class PlistEditorProvider
@@ -42,15 +37,6 @@ export class PlistEditorProvider
   ): Promise<void> {
     const filepath = document.uri.path;
 
-    const persistentState = {
-      expandedNodes: scopedMemento(
-        this.memento,
-        keyName(filepath, 'expandedNodes'),
-        []
-      ),
-      columnWidths: scopedMemento(this.memento, keyName('column', 'width'), {}),
-    };
-
     let webviewController = this.webviewControllerByPath.get(filepath);
     if (!webviewController) {
       webviewController = new PlistWebviewController(
@@ -58,7 +44,7 @@ export class PlistEditorProvider
         webviewPanel,
         this.extensionUri,
         this.storageLocations,
-        persistentState
+        this.memento
       );
       this.disposables.push(webviewController);
       this.webviewControllerByPath.set(filepath, webviewController);

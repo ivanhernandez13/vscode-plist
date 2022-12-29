@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import {executeVSCodeCommand} from '../../../common/utilities/vscode';
 
 import {NodePlistReader} from './node_plist_reader';
 
@@ -42,6 +43,10 @@ describe('Node Plist Reader', () => {
     DateItem: new Date(0),
     DataItem: Buffer.from('Hello World!'),
   };
+
+  beforeAll(() => executeVSCodeCommand('closeAllEditors'));
+
+  afterEach(() => executeVSCodeCommand('closeAllEditors'));
 
   it('converts plist document to json', async () => {
     const document = await vscode.workspace.openTextDocument({

@@ -3,9 +3,12 @@ import {
   ObjectAndKey,
 } from '../../core/textual/model/plist_parser';
 
-function expectToBeObjectOrArray(
-  element: ObjectAndKey | ArrayAndIndex | undefined
-): element is ObjectAndKey | ArrayAndIndex {
+export function expectToBe<T>(a: T, b: T): boolean {
+  expect(a).toBe(b);
+  return a === b;
+}
+
+export function expectToBeDefined<T>(element: T | undefined): element is T {
   expect(element).toBeDefined();
   return element !== undefined;
 }
@@ -13,7 +16,7 @@ function expectToBeObjectOrArray(
 export function expectToBeObject(
   element: ObjectAndKey | ArrayAndIndex | undefined
 ): element is ObjectAndKey {
-  if (!expectToBeObjectOrArray(element)) {
+  if (!expectToBeDefined(element)) {
     return false;
   }
 
@@ -26,7 +29,7 @@ export function expectToBeObject(
 export function expectToBeArray(
   element: ObjectAndKey | ArrayAndIndex | undefined
 ): element is ArrayAndIndex {
-  if (!expectToBeObjectOrArray(element)) {
+  if (!expectToBeDefined(element)) {
     return false;
   }
 

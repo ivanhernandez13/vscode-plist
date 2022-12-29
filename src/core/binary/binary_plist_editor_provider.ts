@@ -1,14 +1,14 @@
 import * as vscode from 'vscode';
 
-import {SelfDisposing} from '../../common/utilities/self_disposing';
+import {SelfDisposing} from '../../common/utilities/disposable';
 import {GeneratedFileTracker} from './generated_file_tracker';
 import {PlistEditorProvider} from '../textual/plist_editor_provider';
 import {replaceTab} from '../../common/utilities/tab';
 import {generatedFileUri} from '../../common/generated_files';
 import {isBinaryPlist} from './decoder/binary_plist_decoder';
 import {getConfiguration, UriUtils} from '../../common/utilities/vscode';
-import {isLocalMacOS} from 'host';
-import {generateTextualPlist, exportTextualPlist} from 'decoder';
+import {isLocalMacOS} from '../../common/utilities/host';
+import {generateTextualPlist, exportTextualPlist} from './decoder';
 import {BinaryPlistDocument} from './binary_plist_document';
 
 /**

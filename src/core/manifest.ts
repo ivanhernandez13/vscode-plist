@@ -9,7 +9,6 @@ export const MANIFEST = {
     expandAll: 'plistEditor.expandAll',
     openWithDefaultEditor: 'plistEditor.openWithDefaultEditor',
     openWithPlistEditor: 'plistEditor.openWithPlistEditor',
-    openWith: 'vscode.openWith',
   },
   SETTINGS: {
     spacing: 'plist.editor.spacing',

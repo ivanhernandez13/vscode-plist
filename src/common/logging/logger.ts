@@ -6,3 +6,8 @@ export interface Logger {
   error(msg: string, args: unknown[]): void;
   verbose(msg: string, args: unknown[]): void;
 }
+
+/** Log function for temporary logs during development. */
+export function readme(...args: unknown[]) {
+  console.log('README:', ...args);
+}

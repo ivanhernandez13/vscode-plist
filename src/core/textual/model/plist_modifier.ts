@@ -1,6 +1,6 @@
 import {EventEmitter} from 'vscode';
 
-import {SelfDisposing} from '../../../common/utilities/self_disposing';
+import {SelfDisposing} from '../../../common/utilities/disposable';
 import {ArrayAndIndex, ObjectAndKey} from './plist_parser';
 import {isPlainObject, PlainObject} from '../../../common/utilities/object';
 
@@ -10,6 +10,7 @@ import {
   PlistEntryType,
   defaultValueForPlistType,
 } from './plist_view_model';
+import {readme} from '../../../common/logging/logger';
 
 type ModelValue =
   | ({kind: 'array'} & ArrayAndIndex)
@@ -27,23 +28,23 @@ export class PlistModifier extends SelfDisposing {
   private readonly rootDidChange = new EventEmitter<PlainObject | unknown[]>();
   readonly onRootDidChange = this.rootDidChange.event;
 
-  constructor(
-    readonly viewModelById = new Map<number, PlistEntry>(),
-    /**
-     * A mapping of every element inside an object or array by their ID.
-     * e.g.
-     * Object: {a: '', b: [0,1], c: {z: ''}}
-     * Map: {
-     *   0: {key: 'a', object: {a: '', b: [0,1], c: {z: ''}}}
-     *   1: {key: 'b', object: {a: '', b: [0,1], c: {z: ''}}}
-     *   2: {index: 0, array: [0,1]}
-     *   3: {index 1, array: [0,1]}
-     *   4: {key: 'c', object: {a: '', b: [0,1], c: {z: ''}}}
-     *   5: {key: 'z', object: {z: ''}}
-     * }
-     */
-    readonly modelById = new Map<number, ArrayAndIndex | ObjectAndKey>()
-  ) {
+  readonly viewModelById = new Map<number, PlistEntry>();
+  /**
+   * A mapping of every element inside an object or array by their ID.
+   * e.g.
+   * Object: {a: '', b: [0,1], c: {z: ''}}
+   * Map: {
+   *   0: {key: 'a', object: {a: '', b: [0,1], c: {z: ''}}}
+   *   1: {key: 'b', object: {a: '', b: [0,1], c: {z: ''}}}
+   *   2: {index: 0, array: [0,1]}
+   *   3: {index 1, array: [0,1]}
+   *   4: {key: 'c', object: {a: '', b: [0,1], c: {z: ''}}}
+   *   5: {key: 'z', object: {z: ''}}
+   * }
+   */
+  readonly modelById = new Map<number, ArrayAndIndex | ObjectAndKey>();
+
+  constructor() {
     super();
     this.disposables.push(this.rootDidChange);
   }
@@ -176,6 +177,7 @@ export class PlistModifier extends SelfDisposing {
         ? parentModel.object[parentModel.key]
         : parentModel.array[parentModel.index];
     const type = plistTypeForValue(childValue);
+    readme('addNodeModel -> type_childValue', type, childValue);
 
     if (type === 'Array' || type === 'Dictionary') {
       if (Array.isArray(childValue)) {

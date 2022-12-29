@@ -7,13 +7,17 @@ import {BinaryPlistEditorProvider} from '../binary/binary_plist_editor_provider'
 import {MANIFEST} from '../manifest';
 import {PlainObject} from '../../common/utilities/object';
 import {PlistOperations} from './plist_operations';
-import {ScopedMemento} from '../../common/utilities/scoped_memento';
-import {SelfDisposing} from '../../common/utilities/self_disposing';
+import {SelfDisposing} from '../../common/utilities/disposable';
 import {StorageLocations} from '../../common/storage_location';
 import {arrayRemove} from '../../common/utilities/array';
 import {errorMessageOrToString} from '../binary/decoder/error';
 import {logger} from '../../common/logging/extension_logger';
-import {sha256} from 'hash';
+import {
+  PersistentState,
+  PlistDocumentAttributes,
+  TextDocumentContent,
+} from './plist_editor_helpers';
+import {scopedMemento} from '../../common/utilities/scoped_memento';
 
 function entriesWithNumberOfChildren(
   node: PlistEntry,
@@ -30,20 +34,8 @@ function entriesWithNumberOfChildren(
   }
 }
 
-class TextDocumentContent {
-  private contentHash?: string;
-
-  constructor(private readonly document: vscode.TextDocument) {}
-
-  private calculateContentHash(): Promise<string> {
-    return sha256(this.document.getText());
-  }
-
-  async contentHasChanged(): Promise<boolean> {
-    const lastContentHash = this.contentHash;
-    this.contentHash = await this.calculateContentHash();
-    return lastContentHash !== this.contentHash;
-  }
+function keyName(path: string, name: string): string {
+  return `plistEditor:${path}.${name}`;
 }
 
 /**
@@ -55,28 +47,36 @@ export class PlistWebviewController extends SelfDisposing {
 
   private pendingContent?: string;
 
-  readonly docAttributes: {
-    readonly isGenerated: boolean;
-    readonly isReadonly: boolean;
-  };
+  readonly docAttributes: PlistDocumentAttributes;
 
   private readonly content: TextDocumentContent;
+
+  private readonly persistentState: PersistentState;
 
   constructor(
     private readonly document: vscode.TextDocument,
     readonly panel: vscode.WebviewPanel,
     extensionUri: vscode.Uri,
     private readonly storageLocations: StorageLocations,
-    private readonly persistentState: {
-      expandedNodes: ScopedMemento<number[]>;
-      columnWidths: ScopedMemento<{first?: string; second?: string}>;
-    }
+    private readonly memento: vscode.Memento
   ) {
     super();
     this.content = new TextDocumentContent(document);
     this.operations = new PlistOperations(document);
     this.disposables.push(this.operations);
     this.docAttributes = this.calculateDocAttributes();
+
+    const expandedNodes = scopedMemento(
+      this.memento,
+      keyName(document.uri.path, 'expandedNodes'),
+      []
+    );
+    const columnWidths = scopedMemento(
+      this.memento,
+      keyName('column', 'width'),
+      {}
+    );
+    this.persistentState = {expandedNodes, columnWidths};
 
     const webview = panel.webview;
     webview.options = {

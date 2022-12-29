@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-import {ProvisioningProfileEditorProvider} from 'provisioning_profile_editor_provider';
+import {ProvisioningProfileEditorProvider} from './core/mobileprovision/provisioning_profile_editor_provider';
 import {StorageLocations} from './common/storage_location';
 import {BinaryPlistEditorProvider} from './core/binary/binary_plist_editor_provider';
 import {GeneratedFileTracker} from './core/binary/generated_file_tracker';

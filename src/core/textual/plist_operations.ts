@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 import {PlainObject} from '../../common/utilities/object';
-import {SelfDisposing} from '../../common/utilities/self_disposing';
+import {SelfDisposing} from '../../common/utilities/disposable';
 import {PlistModifier} from './model/plist_modifier';
 import {PlistParser} from './model/plist_parser';
 import {PlistEntry} from './model/plist_view_model';

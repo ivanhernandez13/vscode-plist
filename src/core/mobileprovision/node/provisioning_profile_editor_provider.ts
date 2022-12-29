@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 
 import {checkOutput} from '../../../common/utilities/node/child_process';
-import {SelfDisposing} from '../../../common/utilities/self_disposing';
+import {SelfDisposing} from '../../../common/utilities/disposable';
 import {PlistEditorProvider} from '../../textual/plist_editor_provider';
 import {generatedFileUri} from '../../../common/generated_files';
 import {replaceTab} from '../../../common/utilities/tab';

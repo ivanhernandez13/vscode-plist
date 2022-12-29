@@ -35,9 +35,9 @@ export class PlistParser {
    * array. If the value is an item in a dictionary, the stored value will be
    * the values key. Values of all other types are stored directly.
    */
-  constructor(modifierOrModelMap: PlistModifier) {
-    this.modelMap = modifierOrModelMap.modelById;
-    this.viewModelMap = modifierOrModelMap.viewModelById;
+  constructor(modifier: PlistModifier) {
+    this.modelMap = modifier.modelById;
+    this.viewModelMap = modifier.viewModelById;
   }
 
   parseIntoViewModel(content: PlainObject | unknown[]): PlistEntry {
