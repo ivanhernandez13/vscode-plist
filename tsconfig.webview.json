@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["es2019", "dom"],
+    "target": "es5",
+    "declaration": false,
+    "sourceMap": true,
+    "outDir": ".",
+    "rootDir": "ui"
+  },
+  "include": ["ui/**/*.ts"]
+}

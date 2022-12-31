@@ -18,6 +18,10 @@ import {
   TextDocumentContent,
 } from './plist_editor_helpers';
 import {scopedMemento} from '../../common/utilities/scoped_memento';
+import {
+  WebviewMessage,
+  WebviewStateChangedMessagePayload,
+} from '../../common/webview_types/message';
 
 function entriesWithNumberOfChildren(
   node: PlistEntry,
@@ -94,7 +98,7 @@ export class PlistWebviewController extends SelfDisposing {
           '@vscode/codicons',
           'dist',
         ]),
-        getWebviewUri('webview.css'),
+        getWebviewUri('webview.css', ['ui', 'resources', 'styles']),
       ],
     });
 
@@ -200,18 +204,15 @@ export class PlistWebviewController extends SelfDisposing {
     return undefined;
   }
 
-  private handleIncomingMessages(message: PlainObject): boolean {
-    if (typeof message.command !== 'string') {
+  private handleIncomingMessages(untypedMessage: PlainObject): boolean {
+    if (typeof untypedMessage.command !== 'string') {
       return false;
     }
+    const message = untypedMessage as unknown as WebviewMessage;
 
     switch (message.command) {
       case 'viewModelAdd':
       case 'viewModelDelete': {
-        if (typeof message.id !== 'number') {
-          break;
-        }
-
         const messageId = message.id;
         const expandedNodes = this.persistentState.expandedNodes.get();
         if (message.command === 'viewModelAdd') {
@@ -233,40 +234,33 @@ export class PlistWebviewController extends SelfDisposing {
         return false;
       }
 
-      case 'viewModelUpdate':
-        if (typeof message.id !== 'number') {
-          break;
-        } else if (typeof message.kind !== 'string') {
-          break;
-        } else if (typeof message.newValue !== 'string') {
-          break;
-        }
-
+      case 'viewModelUpdate': {
+        let result: boolean;
         switch (message.kind) {
           case 'key':
-            return this.operations.modifier.updateModelNodeKey(
+            result = this.operations.modifier.updateModelNodeKey(
               message.id,
               message.newValue
             );
+            break;
           case 'type':
-            return this.operations.modifier.updateModelNodeType(
+            result = this.operations.modifier.updateModelNodeType(
               message.id,
               message.newValue as PlistEntryType
             );
+            break;
           case 'value':
-            return this.operations.modifier.updateModelNodeValue(
+            result = this.operations.modifier.updateModelNodeValue(
               message.id,
               message.newValue
             );
+            break;
         }
-        break;
+        return result;
+      }
 
       case 'webviewStateChanged': {
-        const payload = message.payload as {
-          key: string;
-          newValue: unknown;
-        };
-        this.handleWebviewStateChange(payload.key, payload.newValue);
+        this.handleWebviewStateChange(message.payload);
         break;
       }
 
@@ -277,10 +271,10 @@ export class PlistWebviewController extends SelfDisposing {
         );
         break;
 
-      case 'searchOnType':
-        // TODO: Figure out how to make find first instance.
-        // vscode.commands.executeCommand('editor.action.webvieweditor.showFind');
-        break;
+      // TODO: Figure out how to make find first instance.
+      // case 'searchOnType':
+      // vscode.commands.executeCommand('editor.action.webvieweditor.showFind');
+      // break;
 
       default:
         break;
@@ -288,27 +282,17 @@ export class PlistWebviewController extends SelfDisposing {
     return false;
   }
 
-  private handleWebviewStateChange(key: string, value: unknown): void {
+  private handleWebviewStateChange(
+    payload: WebviewStateChangedMessagePayload
+  ): void {
+    const {key, newValue} = payload;
     switch (key) {
       case 'columnWidths': {
-        const columnWidths = value as {
-          first?: string;
-          second?: string;
-        };
-        this.persistentState.columnWidths.update(columnWidths);
+        this.persistentState.columnWidths.update(newValue);
         break;
       }
       case 'expandedNodeIds': {
-        if (!Array.isArray(value)) {
-          logger.error(
-            `Receieved webview state change message for ${key} with unexpected value ${String(
-              value
-            )}.`
-          );
-          return;
-        }
-
-        this.persistentState.expandedNodes.update(value);
+        this.persistentState.expandedNodes.update(newValue);
         break;
       }
       default:

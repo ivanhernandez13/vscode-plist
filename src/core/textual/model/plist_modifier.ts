@@ -10,7 +10,6 @@ import {
   PlistEntryType,
   defaultValueForPlistType,
 } from './plist_view_model';
-import {readme} from '../../../common/logging/logger';
 
 type ModelValue =
   | ({kind: 'array'} & ArrayAndIndex)
@@ -177,7 +176,6 @@ export class PlistModifier extends SelfDisposing {
         ? parentModel.object[parentModel.key]
         : parentModel.array[parentModel.index];
     const type = plistTypeForValue(childValue);
-    readme('addNodeModel -> type_childValue', type, childValue);
 
     if (type === 'Array' || type === 'Dictionary') {
       if (Array.isArray(childValue)) {
@@ -224,6 +222,7 @@ export class PlistModifier extends SelfDisposing {
 
   deleteNodeModel(id: number): boolean {
     const model = this.getModelForId(id);
+
     switch (model?.kind) {
       case 'array':
         model.array.splice(model.index, 1);

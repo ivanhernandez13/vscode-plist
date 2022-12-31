@@ -13,7 +13,7 @@
     "./node_modules/vscode/lib/*",
     "./node_modules/vscode/vscode.d.ts",
     "src/**/*.ts",
-    "ui/icons/**/*.svg",
+    "ui/resources/icons/**/*.svg",
     "images/**/*.png"
   ],
   "exclude": ["node_modules"]

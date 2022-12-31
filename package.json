@@ -9,6 +9,7 @@
   "author": {
     "name": "Ivan Hernandez"
   },
+  "browser": "./dist/extension-web.js",
   "bugs": {
     "url": "https://github.com/ivanherandez13/vscode-plist/issues"
   },
@@ -54,16 +55,6 @@
     "configuration": {
       "title": "Property List Editor",
       "properties": {
-        "plist.editor.spacing": {
-          "description": "The vertical spacing between entries.",
-          "default": "compact",
-          "enum": [
-            "compact",
-            "comfortable",
-            "spacious"
-          ],
-          "type": "string"
-        },
         "plist.binarySupport.decoder": {
           "description": "The decoder to use when working with binary plists. This option is only supported on macOS as `plutil` is only available on macOS. All other platforms use the experimental extension decoder.",
           "default": "plutil",
@@ -73,14 +64,24 @@
           ],
           "type": "string"
         },
+        "plist.editor.spacing": {
+          "description": "The vertical spacing between entries.",
+          "default": "compact",
+          "enum": [
+            "comfortable",
+            "compact",
+            "spacious"
+          ],
+          "type": "string"
+        },
         "plist.logging.level": {
           "description": "The log level. Only enable for debugging.",
           "default": null,
           "enum": [
-            "verbose",
+            "error",
             "info",
-            "warning",
-            "error"
+            "verbose",
+            "warning"
           ],
           "type": "string"
         }
@@ -179,7 +180,7 @@
   "dependencies": {
     "@types/plist": "^3.0.2",
     "@vscode/codicons": "^0.0.32",
-    "plist": "^3.0.4"
+    "plist": "^3.0.6"
   },
   "description": "Allows viewing and editing files in a plist editor",
   "devDependencies": {
@@ -190,7 +191,6 @@
     "@typescript-eslint/eslint-plugin": "^5.9.1",
     "@typescript-eslint/parser": "^5.9.1",
     "@vscode/test-electron": "^2.0.3",
-    "browser": "^0.2.6",
     "buffer": "^6.0.3",
     "eslint": "^8.6.0",
     "eslint-config-prettier": "^8.5.0",
@@ -212,6 +212,10 @@
     "node": ">=12.0.0",
     "vscode": "^1.73.0"
   },
+  "extensionKind": [
+    "ui",
+    "workspace"
+  ],
   "icon": "icon.png",
   "keywords": [
     "plist",
@@ -220,35 +224,31 @@
   ],
   "license": "MIT",
   "main": "./dist/extension.js",
-  "browser": "./dist/extension-web.js",
   "name": "vscode-plist",
+  "preview": true,
   "publisher": "ivhernandez",
   "repository": {
     "url": "https://github.com/ivanhernandez13/vscode-plist.git",
     "type": "git"
   },
   "scripts": {
-    "compile": "webpack",
+    "clean": "gts clean",
+    "compile": "webpack --config-name node",
+    "compile-ui": "webpack --config-name webview",
+    "compile-web": "webpack --config-name browser",
     "compile-tests": "tsc -p . --outDir out",
-    "compile-ui": "tsc ./ui/webview.ts --sourceMap true --target es5 --lib es2019,dom",
+    "fix": "gts fix",
     "lint": "gts lint",
     "package": "webpack --mode production --devtool hidden-source-map",
     "prepare": "npm run compile",
     "pretest": "npm run compile-tests && npm run compile",
     "test": "node ./out/test/runTest.js",
     "vscode:prepublish": "npm run package",
-    "watch": "webpack --watch",
-    "watch-tests": "tsc -p . -w --outDir out",
+    "webpack": "webpack",
+    "watch": "npm run compile --watch",
     "watch-ui": "npm run compile-ui --watch",
-    "compile-web": "webpack",
-    "watch-web": "webpack --watch",
-    "clean": "gts clean",
-    "fix": "gts fix"
+    "watch-web": "npm run compile-web --watch",
+    "watch-tests": "tsc -p . -w --outDir out"
   },
-  "version": "0.1.4",
-  "extensionKind": [
-    "ui",
-    "workspace"
-  ],
-  "preview": true
+  "version": "0.1.5"
 }
