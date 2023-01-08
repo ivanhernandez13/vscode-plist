@@ -2,11 +2,11 @@ import * as vscode from 'vscode';
 
 import {checkOutput} from '../../../common/utilities/node/child_process';
 import {SelfDisposing} from '../../../common/utilities/disposable';
-import {PlistEditorProvider} from '../../textual/plist_editor_provider';
 import {generatedFileUri} from '../../../common/generated_files';
 import {replaceTab} from '../../../common/utilities/tab';
 import {quoted} from '../../../common/utilities/string';
 import {UriUtils} from '../../../common/utilities/vscode';
+import {MANIFEST} from '../../manifest';
 
 interface ProvisioningProfilePlistDocument extends vscode.CustomDocument {
   generatedUri: vscode.Uri;
@@ -17,8 +17,6 @@ export class ProvisioningProfileEditorProvider
   implements
     vscode.CustomReadonlyEditorProvider<ProvisioningProfilePlistDocument>
 {
-  static readonly viewType = 'plistEditor.provisioningProfileEdit';
-
   constructor(private readonly storageLocation: vscode.Uri) {
     super();
     this.disposables.push(...this.performRegistrations());
@@ -59,9 +57,14 @@ export class ProvisioningProfileEditorProvider
 
     setTimeout(async () => {
       await replaceTab(
-        document.uri,
-        document.generatedUri,
-        PlistEditorProvider.viewType
+        {
+          uri: document.uri,
+          viewType: MANIFEST.customEditors.provisioningProfile,
+        },
+        {
+          uri: document.generatedUri,
+          viewType: MANIFEST.customEditors.plistEditor,
+        }
       );
     });
   }
@@ -69,7 +72,7 @@ export class ProvisioningProfileEditorProvider
   private performRegistrations(): vscode.Disposable[] {
     return [
       vscode.window.registerCustomEditorProvider(
-        ProvisioningProfileEditorProvider.viewType,
+        MANIFEST.customEditors.provisioningProfile,
         this
       ),
     ];

@@ -4,6 +4,7 @@ import {readme} from '../../common/logging/logger';
 import {StorageLocations} from '../../common/storage_location';
 import {disposeAndClear} from '../../common/utilities/disposable';
 import {ObjectUtils, PlainObject} from '../../common/utilities/object';
+import {WebviewMessage} from '../../common/webview_types/message';
 import {FakeMemento} from '../../test/fakes/fake_scoped_memento';
 import {
   SuperFakeWebview,
@@ -72,7 +73,7 @@ function webviewWithDocument(
   document: vscode.TextDocument,
   disposables: vscode.Disposable[]
 ) {
-  const webview = new SuperFakeWebview<PlainObject>();
+  const webview = new SuperFakeWebview<WebviewMessage>();
   const webviewPanel = new FakeWebviewPanel(webview);
   const extensionUri = fakeFileSystemUri('vscode-plist');
   const storageLocations: StorageLocations = {
@@ -181,7 +182,7 @@ describe('Plist Webview Controller', () => {
 
     webview.postWebviewMessage({
       command: 'webviewStateChanged',
-      payload: {key: 'columnWidths', newValue: {first: 30}},
+      payload: {key: 'columnWidths', newValue: {first: '30'}},
     });
     const key = memento.oneAndOnlyKey;
     if (!expectToBeDefined(key)) return;
@@ -189,15 +190,15 @@ describe('Plist Webview Controller', () => {
 
     webview.postWebviewMessage({
       command: 'webviewStateChanged',
-      payload: {key: 'columnWidths', newValue: {second: 15}},
+      payload: {key: 'columnWidths', newValue: {second: '15'}},
     });
     expect(memento.get(key)).toEqual({second: 15});
 
     webview.postWebviewMessage({
       command: 'webviewStateChanged',
-      payload: {key: 'columnWidths', newValue: {first: 30, second: 15}},
+      payload: {key: 'columnWidths', newValue: {first: '30', second: '15'}},
     });
-    expect(memento.get(key)).toEqual({first: 30, second: 15});
+    expect(memento.get(key)).toEqual({first: '30', second: '15'});
   });
 
   it('redirects to default editor', async () => {
@@ -209,7 +210,7 @@ describe('Plist Webview Controller', () => {
     const spy = spyOn(vscode.commands, 'executeCommand');
     webview.postWebviewMessage({command: 'openWithDefaultEditor'});
     expect(spy).toHaveBeenCalledWith(
-      MANIFEST.COMMANDS.openWithDefaultEditor,
+      MANIFEST.commands.openWithDefaultEditor,
       document.uri
     );
   });
@@ -274,5 +275,22 @@ describe('Plist Webview Controller', () => {
 
   it('updates node', async () => {
     //TODO
+  });
+
+  it('renders view model when requested ', async () => {
+    const {webview, webviewController} = await webviewWithContent(
+      PLIST_CONTENT,
+      disposables
+    );
+    const fakePanel = webviewController.panel as FakeWebviewPanel;
+    fakePanel.visible = false;
+
+    const response = await webview.postWebviewMessageAwaitResponseType(
+      {command: 'viewModelRequest'},
+      'renderViewModel'
+    );
+    expect(
+      ObjectUtils.deepLength(response.viewModel as PlainObject)
+    ).toBeGreaterThan(0);
   });
 });

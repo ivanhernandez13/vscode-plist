@@ -127,7 +127,7 @@ export class PlistWebviewController extends SelfDisposing {
 
         const content = this.pendingContent;
         this.pendingContent = undefined;
-        this.renderEditor(content);
+        this.renderEditor({updatedContent: content});
       },
       this,
       this.disposables
@@ -153,16 +153,20 @@ export class PlistWebviewController extends SelfDisposing {
     return {isGenerated, isReadonly};
   }
 
-  async renderEditor(updatedContent?: string): Promise<void> {
-    if (!this.panel.visible) {
-      this.pendingContent = updatedContent;
+  async renderEditor(options?: {
+    updatedContent?: string;
+    force?: true;
+  }): Promise<void> {
+    if (!this.panel.visible && !options?.force) {
+      logger.warning('Skipping rendering webview because it is not visible');
+      this.pendingContent = options?.updatedContent;
       return;
     }
 
-    if (updatedContent) {
+    if (options?.updatedContent) {
       // TODO: This should not be needed, the model should update itself
       // whenever a node is added or removed.
-      this.operations.reloadModel(updatedContent);
+      this.operations.reloadModel(options.updatedContent);
     }
     const viewModel = await this.viewModelOrPostError();
     if (!viewModel) return;
@@ -175,21 +179,24 @@ export class PlistWebviewController extends SelfDisposing {
       );
     }
 
-    if (await this.content.contentHasChanged()) {
+    if (options?.force || (await this.content.contentHasChanged())) {
       this.postRenderViewModel(viewModel);
     }
   }
 
-  private postRenderViewModel(viewModel: PlistEntry): void {
-    const spacing = getConfiguration(MANIFEST.SETTINGS.spacing);
-    this.panel.webview.postMessage({
+  private async postRenderViewModel(viewModel: PlistEntry): Promise<void> {
+    const spacing = getConfiguration(MANIFEST.settings.spacing);
+    const message = {
       command: 'renderViewModel',
       viewModel,
       expandedNodes: this.persistentState.expandedNodes.get(),
       isReadonly: this.docAttributes.isReadonly,
       columnWidths: this.persistentState.columnWidths.get(),
       spacing,
-    });
+    };
+    if (!(await this.panel.webview.postMessage(message))) {
+      logger.warning('"renderViewModel" was not posted.', message);
+    }
   }
 
   private async viewModelOrPostError(): Promise<PlistEntry | undefined> {
@@ -211,6 +218,9 @@ export class PlistWebviewController extends SelfDisposing {
     const message = untypedMessage as unknown as WebviewMessage;
 
     switch (message.command) {
+      case 'viewModelRequest':
+        this.renderEditor({force: true});
+        break;
       case 'viewModelAdd':
       case 'viewModelDelete': {
         const messageId = message.id;
@@ -266,7 +276,7 @@ export class PlistWebviewController extends SelfDisposing {
 
       case 'openWithDefaultEditor':
         vscode.commands.executeCommand(
-          MANIFEST.COMMANDS.openWithDefaultEditor,
+          MANIFEST.commands.openWithDefaultEditor,
           this.document.uri
         );
         break;
@@ -327,7 +337,7 @@ export class PlistWebviewController extends SelfDisposing {
       this.renderStylesheets(external.stylesheets);
 
     let body = "<div id='bodyContent'></div>";
-    const logLevel = getConfiguration(MANIFEST.SETTINGS.loggingLevel);
+    const logLevel = getConfiguration(MANIFEST.settings.loggingLevel);
     if (typeof logLevel === 'string') {
       body += `<span id='extensionLogLevel' title='${logLevel}' hidden></span>`;
     }

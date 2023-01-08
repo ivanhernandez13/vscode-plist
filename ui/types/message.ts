@@ -1,38 +1,37 @@
 import {ColumnWidths} from './webview_state';
 
-interface OpenWithDefaultEditorMessage {
-  command: 'openWithDefaultEditor';
+interface WebviewCommandMessage<T extends string> {
+  command: T;
 }
+
+type BaseMsg<T extends string> = WebviewCommandMessage<T>;
 
 export type WebviewStateChangedMessagePayload =
   | {key: 'columnWidths'; newValue: ColumnWidths}
   | {key: 'expandedNodeIds'; newValue: number[]};
 
-interface WebviewStateChangedMessage {
-  command: 'webviewStateChanged';
+interface WebviewStateChangedMessage extends BaseMsg<'webviewStateChanged'> {
   payload: WebviewStateChangedMessagePayload;
 }
 
-interface ViewModelAddMessage {
-  command: 'viewModelAdd';
+interface ViewModelAddMessage extends BaseMsg<'viewModelAdd'> {
   id: number;
 }
 
-interface ViewModelDelete {
-  command: 'viewModelDelete';
+interface ViewModelDeleteMessage extends BaseMsg<'viewModelDelete'> {
   id: number;
 }
 
-interface ViewModelUpdate {
-  command: 'viewModelUpdate';
+interface ViewModelUpdateMessage extends BaseMsg<'viewModelUpdate'> {
   kind: 'key' | 'type' | 'value';
   id: number;
   newValue: string;
 }
 
 export type WebviewMessage =
-  | OpenWithDefaultEditorMessage
   | WebviewStateChangedMessage
   | ViewModelAddMessage
-  | ViewModelDelete
-  | ViewModelUpdate;
+  | ViewModelDeleteMessage
+  | ViewModelUpdateMessage
+  | WebviewCommandMessage<'openWithDefaultEditor'>
+  | WebviewCommandMessage<'viewModelRequest'>;

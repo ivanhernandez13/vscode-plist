@@ -6,6 +6,7 @@ import {BinaryPlistEditorProvider} from './core/binary/binary_plist_editor_provi
 import {GeneratedFileTracker} from './core/binary/generated_file_tracker';
 import {MANIFEST} from './core/manifest';
 import {PlistEditorProvider} from './core/textual/plist_editor_provider';
+import {logger} from './common/logging/extension_logger';
 
 /** Called by VS Code when the extension is activated. */
 export async function activate(context: vscode.ExtensionContext) {
@@ -23,16 +24,20 @@ export async function activate(context: vscode.ExtensionContext) {
       new GeneratedFileTracker()
     ),
     new ProvisioningProfileEditorProvider(storageLocations.mobileprovision),
-    vscode.commands.registerCommand(MANIFEST.COMMANDS.clearCaches, () =>
+    vscode.commands.registerCommand(MANIFEST.commands.clearCaches, () =>
       clearCaches(context.workspaceState)
     )
   );
 }
 
 function clearCaches(workspaceState: vscode.Memento): Promise<unknown> {
-  return Promise.all(
-    workspaceState.keys().map(key => workspaceState.update(key, undefined))
-  );
+  const contents: Array<[string, unknown]> = [];
+  const updates = workspaceState.keys().map(key => {
+    contents.push([key, workspaceState.get(key)]);
+    return workspaceState.update(key, undefined);
+  });
+  logger.info('Clearing workspace state', contents);
+  return Promise.all(updates);
 }
 
 async function createWorkspaceStorage(

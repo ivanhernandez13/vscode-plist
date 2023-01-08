@@ -7,10 +7,11 @@ import {ViewState, WebviewState} from '../types/webview_state';
 
 const NOISY_KEYS = ['lastSelectedNodeId', 'selectedNodeId'];
 const EXTENSION_MONITORED_KEYS = ['columnWidths', 'expandedNodeIds'] as const;
-type ExtensionMonitoredKey = typeof EXTENSION_MONITORED_KEYS[number];
+type ExtensionMonitoredKey = (typeof EXTENSION_MONITORED_KEYS)[number];
 
+const ROOT_PLIST_NODE_ID = -1;
 const ROOT_PLIST_NODE: Readonly<ViewModel> = {
-  id: -1,
+  id: ROOT_PLIST_NODE_ID,
   key: '<placeholder>',
   type: 'String',
   value: '<placeholder>',
@@ -32,8 +33,12 @@ export class StateManager implements WebviewState {
   private viewModelState: ViewModel = ROOT_PLIST_NODE;
 
   private readonly stateSaver = new Debouncer(() => {
+    const viewModel =
+      this.viewModelState.id === ROOT_PLIST_NODE_ID
+        ? undefined
+        : this.viewModelState;
     vsCodeApi.setState({
-      viewModel: this.viewModelState,
+      viewModel,
       view: this.viewState,
     });
   }, seconds(1));

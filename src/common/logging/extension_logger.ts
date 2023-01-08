@@ -9,7 +9,7 @@ class ExtensionLogger implements Logger {
   private readonly severity?: LogSeverity;
 
   constructor() {
-    const logLevel = getConfiguration(MANIFEST.SETTINGS.loggingLevel);
+    const logLevel = getConfiguration(MANIFEST.settings.loggingLevel);
     if (logLevel) {
       this.severity = logLevel as LogSeverity;
       this.loggers.push(

@@ -3,16 +3,21 @@
  * package.json).
  */
 export const MANIFEST = {
-  COMMANDS: {
+  commands: {
     clearCaches: 'plistEditor.clearCaches',
     collapseAll: 'plistEditor.collapseAll',
     expandAll: 'plistEditor.expandAll',
     openWithDefaultEditor: 'plistEditor.openWithDefaultEditor',
     openWithPlistEditor: 'plistEditor.openWithPlistEditor',
   },
-  SETTINGS: {
+  settings: {
     spacing: 'plist.editor.spacing',
     binaryDecoder: 'plist.binarySupport.decoder',
     loggingLevel: 'plist.logging.level',
+  },
+  customEditors: {
+    plistEditor: 'plistEditor.plistedit',
+    binaryPlistEditor: 'plistEditor.bplistedit',
+    provisioningProfile: 'plistEditor.provisioningProfileEdit',
   },
 } as const;

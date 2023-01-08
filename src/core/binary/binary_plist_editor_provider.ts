@@ -2,7 +2,6 @@ import * as vscode from 'vscode';
 
 import {SelfDisposing} from '../../common/utilities/disposable';
 import {GeneratedFileTracker} from './generated_file_tracker';
-import {PlistEditorProvider} from '../textual/plist_editor_provider';
 import {replaceTab} from '../../common/utilities/tab';
 import {generatedFileUri} from '../../common/generated_files';
 import {isBinaryPlist} from './decoder/binary_plist_decoder';
@@ -10,6 +9,7 @@ import {getConfiguration, UriUtils} from '../../common/utilities/vscode';
 import {isLocalMacOS} from '../../common/utilities/host';
 import {generateTextualPlist, exportTextualPlist} from './decoder';
 import {BinaryPlistDocument} from './binary_plist_document';
+import {MANIFEST} from '../manifest';
 
 /**
  * Registers a custom editor that is used whenever a .plist file (binary OR
@@ -24,8 +24,6 @@ export class BinaryPlistEditorProvider
   extends SelfDisposing
   implements vscode.CustomReadonlyEditorProvider<BinaryPlistDocument>
 {
-  static readonly viewType = 'plistEditor.bplistedit';
-
   static get usingMacosDecoder(): boolean {
     return (
       isLocalMacOS() &&
@@ -76,9 +74,11 @@ export class BinaryPlistEditorProvider
 
     setTimeout(async () => {
       await replaceTab(
-        document.uri,
-        document.generatedUri ?? document.uri,
-        PlistEditorProvider.viewType
+        {uri: document.uri, viewType: MANIFEST.customEditors.binaryPlistEditor},
+        {
+          uri: document.generatedUri ?? document.uri,
+          viewType: MANIFEST.customEditors.plistEditor,
+        }
       );
     });
   }
@@ -86,7 +86,7 @@ export class BinaryPlistEditorProvider
   private performRegistrations(): vscode.Disposable[] {
     const registrations = [
       vscode.window.registerCustomEditorProvider(
-        BinaryPlistEditorProvider.viewType,
+        MANIFEST.customEditors.binaryPlistEditor,
         this
       ),
     ];

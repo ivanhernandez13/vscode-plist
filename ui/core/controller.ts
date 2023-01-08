@@ -36,9 +36,16 @@ export class WebviewController {
 
   private restoreWebviewFromSavedState() {
     this.state.restore();
-    this.state.view.errorMessage
-      ? this.renderErrorBody(this.state.view.errorMessage)
-      : this.renderWebviewBody(this.state.viewModel);
+
+    if (this.state.view.errorMessage) {
+      this.renderErrorBody(this.state.view.errorMessage);
+    } else if (this.state.viewModel.id !== -1) {
+      this.renderWebviewBody(this.state.viewModel);
+    } else {
+      vsCodeApi.postMessage({
+        command: 'viewModelRequest',
+      });
+    }
   }
 
   private collectViewAndViewModels(viewModel: ViewModel): ViewAndViewModel[] {

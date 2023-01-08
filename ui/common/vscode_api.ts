@@ -11,18 +11,21 @@ interface NativeVsCodeApi<T extends object> {
 declare function acquireVsCodeApi(): NativeVsCodeApi<{}>;
 
 class VsCodeApi<T extends object> implements NativeVsCodeApi<T> {
+  private lastState: Partial<T> = {};
   private readonly internalVSCodeApi = acquireVsCodeApi();
 
   postMessage(msg: WebviewMessage): void {
     logger.info('VSCode Webview API', `Outgoing message '${msg.command}'`, msg);
     this.internalVSCodeApi.postMessage(msg);
   }
-  setState(state: T): void {
-    logger.info('VSCode Webview API', 'Saving state', state);
-    this.internalVSCodeApi.setState(state);
+  setState(state: Partial<T>): void {
+    const combinedState = Object.assign({}, this.lastState, state);
+    logger.info('VSCode Webview API', 'Saving state', combinedState);
+    this.internalVSCodeApi.setState(combinedState);
   }
   getState(): Partial<T> {
     const state = this.internalVSCodeApi.getState() ?? {};
+    this.lastState = state;
     logger.info('VSCode Webview API', 'Restoring state', state);
     return state;
   }

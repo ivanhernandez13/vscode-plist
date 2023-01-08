@@ -14,8 +14,6 @@ export class PlistEditorProvider
   extends SelfDisposing
   implements vscode.CustomTextEditorProvider
 {
-  static readonly viewType = 'plistEditor.plistedit';
-
   private readonly webviewControllerByPath = new Map<
     string,
     PlistWebviewController
@@ -69,7 +67,7 @@ export class PlistEditorProvider
         const webviewController = this.webviewControllerByPath.get(docPath);
         if (!webviewController) return;
 
-        webviewController.renderEditor(e.document.getText());
+        webviewController.renderEditor({updatedContent: e.document.getText()});
       },
       500
     );
@@ -78,14 +76,14 @@ export class PlistEditorProvider
       vscode.workspace.onDidChangeConfiguration(e => {
         if (
           !(
-            e.affectsConfiguration(MANIFEST.SETTINGS.binaryDecoder) ||
-            e.affectsConfiguration(MANIFEST.SETTINGS.spacing)
+            e.affectsConfiguration(MANIFEST.settings.binaryDecoder) ||
+            e.affectsConfiguration(MANIFEST.settings.spacing)
           )
         ) {
           return;
         }
 
-        if (e.affectsConfiguration(MANIFEST.SETTINGS.binaryDecoder)) {
+        if (e.affectsConfiguration(MANIFEST.settings.binaryDecoder)) {
           const entries = this.webviewControllerByPath.entries();
           for (const [path, controller] of entries) {
             if (!controller.docAttributes.isGenerated) continue;
@@ -93,35 +91,43 @@ export class PlistEditorProvider
             controller.dispose();
             this.webviewControllerByPath.delete(path);
           }
-        } else if (e.affectsConfiguration(MANIFEST.SETTINGS.spacing)) {
+        } else if (e.affectsConfiguration(MANIFEST.settings.spacing)) {
           const controllers = this.webviewControllerByPath.values();
           for (const controller of controllers) {
             controller.panel.webview.postMessage({
               command: 'updateSpacing',
-              spacing: getConfiguration(MANIFEST.SETTINGS.spacing),
+              spacing: getConfiguration(MANIFEST.settings.spacing),
             });
           }
         }
       }),
       vscode.window.registerCustomEditorProvider(
-        PlistEditorProvider.viewType,
+        MANIFEST.customEditors.plistEditor,
         this,
         {
           webviewOptions: {enableFindWidget: true},
         }
       ),
       vscode.commands.registerCommand(
-        MANIFEST.COMMANDS.openWithDefaultEditor,
-        resource => replaceTab(resource, resource, 'default')
+        MANIFEST.commands.openWithDefaultEditor,
+        resource =>
+          replaceTab(resource, {
+            uri: resource,
+            viewType: 'default',
+          })
       ),
       vscode.commands.registerCommand(
-        MANIFEST.COMMANDS.openWithPlistEditor,
-        resource => replaceTab(resource, resource, PlistEditorProvider.viewType)
+        MANIFEST.commands.openWithPlistEditor,
+        resource =>
+          replaceTab(resource, {
+            uri: resource,
+            viewType: MANIFEST.customEditors.plistEditor,
+          })
       ),
-      vscode.commands.registerCommand(MANIFEST.COMMANDS.collapseAll, () =>
+      vscode.commands.registerCommand(MANIFEST.commands.collapseAll, () =>
         this.postCommandToActiveWebview('collapseAll')
       ),
-      vscode.commands.registerCommand(MANIFEST.COMMANDS.expandAll, () =>
+      vscode.commands.registerCommand(MANIFEST.commands.expandAll, () =>
         this.postCommandToActiveWebview('expandAll')
       ),
       vscode.workspace.onDidChangeTextDocument(e => debouncedReload.run(e)),
