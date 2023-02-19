@@ -1,1 +1,1 @@
-/Users/ivanhernandez/dev/plist-editor/ui/types/webview_state.ts
+../../../ui/types/webview_state.ts
