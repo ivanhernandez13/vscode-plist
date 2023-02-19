@@ -1,1 +1,1 @@
-/Users/ivanhernandez/dev/plist-editor/ui/types/view_model.ts
+../../../ui/types/view_model.ts

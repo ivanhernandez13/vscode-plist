@@ -1,1 +1,1 @@
-/Users/ivanhernandez/dev/plist-editor/ui/types/message.ts
+../../../ui/types/message.ts
