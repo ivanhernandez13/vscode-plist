@@ -21,8 +21,8 @@ Description
 
 #### Binary Plists
 
-This extension can __view__ and __edit__ binary plists by converting the binary plist into its ASCII
-representation. This ASCII version is a separate file in a temporary directory. The temporary file
+This extension can __view__ and __edit__ binary plists by converting the binary plist into its XML
+representation. This XML version is a separate file in a temporary directory. The temporary file
 is watched for changes and any changes are automatically saved back to the binary version.
 
 <!-- ![view and edit binary plists](images/binary_plist.png) -->
